@@ -93,12 +93,9 @@ export default function HomePage() {
                 AI automation handling that same work costs around a third of that.{' '}
                 <Strong>Your admin person keeps their job — they just stop doing the part that was wasting their time.</Strong>
               </P>
-              <P style={{ color: C.textMid, fontStyle: 'italic', marginBottom: 24 }}>
+              <P style={{ color: C.textMid, fontStyle: 'italic', marginBottom: 0 }}>
                 Nothing goes live until you&apos;ve watched it working on your real jobs. The risk sits with us.
               </P>
-              <Link href="/contact">
-                <Btn primary>Book a 15-Minute Call →</Btn>
-              </Link>
             </Card>
           </Fade>
         </Section>
