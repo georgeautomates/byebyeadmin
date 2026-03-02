@@ -30,7 +30,7 @@ export default function HomePage() {
       <div style={{ background: C.bg }}>
         <Section style={{ textAlign: 'center', paddingBottom: 0 }}>
           <Fade>
-            <H2>Six things it handles. While you handle the fleet.</H2>
+            <H2>Six things we automate. While you handle the fleet.</H2>
           </Fade>
           <Fade delay={0.05}>
             <P style={{ color: C.textMid, marginBottom: 0 }}>Each one is a piece of admin your team currently does by hand.</P>
