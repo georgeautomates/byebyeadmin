@@ -132,8 +132,8 @@ export default function HomePage() {
                 margin: '0 0 32px',
               }}
             >
-              Find out what&apos;s possible for your fleet.{' '}
-              <span style={{ color: C.accent }}>Five minutes. Free.</span>
+              Find out how much this could save your fleet.
+              <span style={{ display: 'block', color: C.accent }}>Five minutes. Free.</span>
             </h2>
             <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
               <Link href="/assessment">

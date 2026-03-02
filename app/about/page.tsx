@@ -20,7 +20,7 @@ export default function AboutPage() {
                 margin: '16px 0 24px',
               }}
             >
-              I Didn&apos;t Set Out to Build AI Automation for Haulage.{' '}
+              I Didn&apos;t Set Out to Build AI Automation for Haulage.<br />
               <Acc>But I Couldn&apos;t Not Do It.</Acc>
             </h1>
           </Fade>
@@ -175,11 +175,6 @@ export default function AboutPage() {
               </Fade>
             ))}
           </div>
-          <Fade delay={0.45}>
-            <P style={{ fontStyle: 'italic', color: C.textMid }}>
-              If at any point it&apos;s not working for you, you stop. No contract. No exit fee.
-            </P>
-          </Fade>
           <div style={{ textAlign: 'center', marginTop: 32, paddingBottom: 40 }}>
             <Fade delay={0.5}>
               <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
