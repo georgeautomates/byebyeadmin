@@ -1,65 +1,138 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState } from 'react';
+import dynamic from 'next/dynamic';
+import { HeroScroll } from '@/components/HeroScroll';
+import { LoadingScreen } from '@/components/LoadingScreen';
+import { AgentShowcaseScroll } from '@/components/AgentShowcaseScroll';
+import { Fade, Btn, Section, Card, H2, P, Strong } from '@/components/ui';
+import { C, FONT } from '@/lib/constants';
+import Link from 'next/link';
+
+// Dynamic imports for canvas-heavy components (browser-only)
+const CTAParticleCanvas = dynamic(
+  () => import('@/components/CTAParticleCanvas').then((m) => m.CTAParticleCanvas),
+  { ssr: false, loading: () => null }
+);
+
+export default function HomePage() {
+  const [heroReady, setHeroReady] = useState(false);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div>
+      <LoadingScreen loaded={heroReady} />
+
+      {/* ── 3D scroll-driven hero (500vh tall) ── */}
+      <HeroScroll onReady={() => setHeroReady(true)} />
+
+      {/* ── Agent showcase intro ── */}
+      <div style={{ background: C.bg }}>
+        <Section style={{ textAlign: 'center', paddingBottom: 0 }}>
+          <Fade>
+            <H2>Six things it handles. While you handle the fleet.</H2>
+          </Fade>
+          <Fade delay={0.05}>
+            <P style={{ color: C.textMid, marginBottom: 0 }}>Each one is a piece of admin your team currently does by hand.</P>
+          </Fade>
+        </Section>
+      </div>
+
+      {/* ── Agent showcase — 400vh sticky scroll ── */}
+      <AgentShowcaseScroll />
+
+      {/* ── VSL placeholder ── */}
+      <div style={{ background: C.bgWhite }}>
+        <Section style={{ textAlign: 'center' }}>
+          <Fade>
+            <H2>Why we built this. And why it works for fleets your size.</H2>
+          </Fade>
+          <Fade delay={0.05}>
+            <P style={{ color: C.textMid, marginBottom: 28 }}>3 minutes. Plain English.</P>
+          </Fade>
+          <Fade delay={0.1}>
+            <div style={{
+              maxWidth: 800, margin: '0 auto 24px',
+              aspectRatio: '16/9', background: C.bg,
+              border: `2px dashed ${C.border}`, borderRadius: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexDirection: 'column', gap: 12,
+            }}>
+              <div style={{ fontSize: '2.5rem', color: C.textDim }}>▶</div>
+              <P style={{ color: C.textDim, margin: 0, fontSize: '0.9rem' }}>
+                Video coming soon — replace with Vimeo embed (autoplay:off, captions:on)
+              </P>
+            </div>
+          </Fade>
+          <Fade delay={0.15}>
+            <P style={{ color: C.textDim, fontStyle: 'italic', fontSize: '0.9rem' }}>
+              Or skip ahead — take the free assessment and get your numbers in 2 minutes.
+            </P>
+          </Fade>
+          <Fade delay={0.2}>
+            <P style={{ color: C.textMid, fontStyle: 'italic', fontSize: '0.85rem', marginTop: 24, marginBottom: 0 }}>
+              Built by someone who came from your industry. Not a tech startup.
+            </P>
+          </Fade>
+        </Section>
+      </div>
+
+      {/* ── Cost question ── */}
+      <div data-section="cost" style={{ background: C.bg }}>
+        <Section>
+          <Fade>
+            <H2>Does the cost stack up?</H2>
+          </Fade>
+          <Fade delay={0.1}>
+            <Card style={{ borderLeft: `4px solid ${C.accent}` }}>
+              <P>
+                Your admin person costs around £15/hour all-in. At 30 hours a week on order entry, invoicing, and
+                portal-checking, that&apos;s roughly £1,800 a month for work that doesn&apos;t need a human brain.
+              </P>
+              <P>
+                AI automation handling that same work costs around a third of that.{' '}
+                <Strong>Your admin person keeps their job — they just stop doing the part that was wasting their time.</Strong>
+              </P>
+              <P style={{ color: C.textMid, fontStyle: 'italic', marginBottom: 24 }}>
+                Nothing goes live until you&apos;ve watched it working on your real jobs. The risk sits with us.
+              </P>
+              <Link href="/contact">
+                <Btn primary>Book a 15-Minute Call →</Btn>
+              </Link>
+            </Card>
+          </Fade>
+        </Section>
+      </div>
+
+      {/* ── Final CTA — dark with particle convergence canvas ── */}
+      <div data-section="cta" style={{ background: C.bgDark, position: 'relative', overflow: 'hidden' }}>
+        {/* Particle convergence background */}
+        <CTAParticleCanvas />
+
+        <Section dark style={{ textAlign: 'center', paddingBottom: 100, position: 'relative', zIndex: 1 }}>
+          <Fade>
+            <h2
+              style={{
+                fontFamily: FONT,
+                fontSize: '2.2rem',
+                fontWeight: 900,
+                color: '#F5F2EF',
+                margin: '0 0 32px',
+              }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+              Find out what&apos;s possible for your fleet.{' '}
+              <span style={{ color: C.accent }}>Five minutes. Free.</span>
+            </h2>
+            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Link href="/assessment">
+                <Btn primary>Take the Free Assessment →</Btn>
+              </Link>
+              <Link href="/contact">
+                <Btn style={{ color: '#F5F2EF', borderColor: 'rgba(245,242,239,0.3)' }}>Book a 15-Minute Call</Btn>
+              </Link>
+            </div>
+          </Fade>
+        </Section>
+      </div>
     </div>
   );
 }
