@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { HeroScroll } from '@/components/HeroScroll';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { AgentShowcaseScroll } from '@/components/AgentShowcaseScroll';
+import { FAQSection } from '@/components/FAQSection';
 import { Fade, Btn, Section, Card, H2, P, Strong } from '@/components/ui';
 import { C, FONT } from '@/lib/constants';
 import Link from 'next/link';
@@ -102,6 +103,9 @@ export default function HomePage() {
           </Fade>
         </Section>
       </div>
+
+      {/* ── FAQ section ── */}
+      <FAQSection />
 
       {/* ── Final CTA — dark with particle convergence canvas ── */}
       <div data-section="cta" style={{ background: C.bgDark, position: 'relative', overflow: 'hidden' }}>
