@@ -826,14 +826,14 @@ async function loadLorry(
   scene:       THREE.Scene,
   lineMats:    LineMaterial[],
   resolution:  THREE.Vector2,
-): Promise<void> {
-  if (!lorryRef.current) return;
+): Promise<{ halfX: number; halfZ: number; height: number } | null> {
+  if (!lorryRef.current) return null;
 
   const loader = new GLTFLoader();
   const gltf = await loader.loadAsync('/models/lorry.glb');
 
   // Guard: component may have unmounted during the async load
-  if (!lorryRef.current) return;
+  if (!lorryRef.current) return null;
 
   const outer = new THREE.Group();
   const inner = new THREE.Group();
@@ -899,6 +899,8 @@ async function loadLorry(
   lorryRef.current.removeFromParent();
   scene.add(outer);
   lorryRef.current = outer;
+
+  return { halfX: fSize.x / 2, halfZ: fSize.z / 2, height: fSize.y };
 }
 
 // ── Props ──────────────────────────────────────────────────────────────────────
@@ -1104,8 +1106,10 @@ export function ThreeHero({ containerRef, onPinsUpdate, onReady }: ThreeHeroProp
     lorryRef.current.add(aiGlow);
 
     // ── Load real GLTF lorry model ────────────────────────────────────────────
+    let lorryBbox: { halfX: number; halfZ: number; height: number } | null = null;
     loadLorry(disposables, lorryRef, scene, allLine2Mats, new THREE.Vector2(W0, H0))
-      .then(() => {
+      .then((bbox) => {
+        if (bbox) lorryBbox = bbox;
         lorryRef.current.add(aiHub);
         lorryRef.current.add(aiGlow);
         clearTimeout(readyFallback);
@@ -1530,6 +1534,41 @@ export function ThreeHero({ containerRef, onPinsUpdate, onReady }: ThreeHeroProp
       camera.position.x += (lorryPt.x + cam.x + mouse.x * 0.5 * mouseScale - camera.position.x) * 0.04;
       camera.position.y += (ROUTE_Y + cam.y - mouse.y * 0.35 * mouseScale   - camera.position.y) * 0.04;
       camera.position.z += (lorryPt.z + cam.z                               - camera.position.z) * 0.05;
+
+      // ── Lorry collision clamp — keep camera outside lorry bounding box ─────
+      if (lorryBbox) {
+        const pad     = 0.35;
+        const angle   = lorryRef.current.rotation.y;
+        const cosA    = Math.cos(-angle);
+        const sinA    = Math.sin(-angle);
+        const dx      = camera.position.x - lorryPt.x;
+        const dz      = camera.position.z - lorryPt.z;
+        const localX  = cosA * dx - sinA * dz;
+        const localZ  = sinA * dx + cosA * dz;
+        const hx      = lorryBbox.halfX + pad;
+        const hz      = lorryBbox.halfZ + pad;
+        const camRelY = camera.position.y - ROUTE_Y;
+        const inX = Math.abs(localX) < hx;
+        const inZ = Math.abs(localZ) < hz;
+        const inY = camRelY > -pad && camRelY < lorryBbox.height + pad;
+        if (inX && inZ && inY) {
+          const overlapX = hx - Math.abs(localX);
+          const overlapZ = hz - Math.abs(localZ);
+          const signX = localX >= 0 ? 1 : -1;
+          const signZ = localZ >= 0 ? 1 : -1;
+          let newLocalX = localX, newLocalZ = localZ;
+          if (overlapX <= overlapZ) {
+            newLocalX = hx * signX;   // push out sideways (shorter path)
+          } else {
+            newLocalZ = hz * signZ;   // push out front/back (shorter path)
+          }
+          const cosB = Math.cos(angle);
+          const sinB = Math.sin(angle);
+          camera.position.x = lorryPt.x + cosB * newLocalX - sinB * newLocalZ;
+          camera.position.z = lorryPt.z + sinB * newLocalX + cosB * newLocalZ;
+        }
+      }
+
       lookAtTarget.lerp(new THREE.Vector3(lorryPt.x + cam.lx, ROUTE_Y + cam.ly, lorryPt.z + cam.lz), 0.05);
       camera.lookAt(lookAtTarget);
       camera.fov += (cam.fov - camera.fov) * 0.04;
