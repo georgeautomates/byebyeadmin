@@ -91,12 +91,12 @@ export function LoadingScreen({ loaded }: LoadingScreenProps) {
             {/* Exhaust */}
             <rect x="60" y="6" width="3" height="8" rx="1" fill={C.textMid} />
             {/* Rear wheel */}
-            <g style={{ transformOrigin: '14px 33px', animation: 'loadWheelSpin 0.9s linear infinite' }}>
+            <g style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: 'loadWheelSpin 0.9s linear infinite' }}>
               <circle cx="14" cy="33" r="7" fill={C.textDim} />
               <circle cx="14" cy="33" r="3" fill={C.border} />
             </g>
             {/* Front wheel */}
-            <g style={{ transformOrigin: '56px 33px', animation: 'loadWheelSpin 0.9s linear infinite' }}>
+            <g style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: 'loadWheelSpin 0.9s linear infinite' }}>
               <circle cx="56" cy="33" r="7" fill={C.textDim} />
               <circle cx="56" cy="33" r="3" fill={C.border} />
             </g>

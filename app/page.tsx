@@ -70,9 +70,21 @@ export default function HomePage() {
             </P>
           </Fade>
           <Fade delay={0.2}>
-            <P style={{ color: C.textMid, fontStyle: 'italic', fontSize: '0.85rem', marginTop: 24, marginBottom: 0 }}>
-              Built by someone who came from your industry. Not a tech startup.
-            </P>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              background: C.tealDim,
+              border: `1px solid ${C.tealBorder}`,
+              borderRadius: 8,
+              padding: '10px 18px',
+              marginTop: 24,
+            }}>
+              <span style={{ color: C.teal, fontWeight: 800, fontSize: '1rem' }}>✓</span>
+              <span style={{ fontFamily: FONT, color: C.teal, fontWeight: 700, fontSize: '0.92rem' }}>
+                Built by someone who came from your industry. Not a tech startup.
+              </span>
+            </div>
           </Fade>
         </Section>
       </div>
