@@ -1110,6 +1110,8 @@ export function ThreeHero({ containerRef, onPinsUpdate, onReady }: ThreeHeroProp
         lorryRef.current.add(aiGlow);
         clearTimeout(readyFallback);
         callOnReady();
+        // ── Intro camera rise — fires as loading screen fades out ──────────
+        gsap.to(cam, { y: 5.5, ly: 2.0, duration: 1.5, ease: 'power2.inOut', delay: 0.6 });
       })
       .catch(() => { callOnReady(); /* model load failed — fire ready anyway */ });
 
@@ -1349,8 +1351,8 @@ export function ThreeHero({ containerRef, onPinsUpdate, onReady }: ThreeHeroProp
     // cam.z = -7.0 → camera at world z = 7.0 + (-7.0) = 0, which is ahead of lorry.
     // cam.lz = -1.4 → look-at z = 7.0 + (-1.4) = 5.6 = lorry's front face.
     const cam = {
-      x: -2.0, y: 5.5, z: -11.0,      // face-on: raised above lorry roof to avoid Act 0→1 clip
-      lx: -0.6, ly: 2.0, lz: -3.5,    // look at front face / grille height (adjusted for elevated start)
+      x: -2.0, y: 3.5, z: -11.0,      // intro start: cab-height view showing the front face
+      lx: -0.6, ly: 1.2, lz: -3.5,    // look-at aimed at grille / lower front face
       fov: isMobile ? 62 : 52,
       bloom: 0.3,
       morph: 0,
