@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { C, FONT, MONO } from '@/lib/constants';
 import { Btn } from '@/components/ui';
+import { useCalendly } from '@/lib/calendly-context';
 import {
   QUESTIONS,
   INTERSTITIALS,
@@ -20,10 +22,35 @@ type Screen = 'welcome' | 'quiz' | 'contact' | 'results';
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export default function AssessmentPage() {
+  return (
+    <Suspense>
+      <AssessmentPageInner />
+    </Suspense>
+  );
+}
+
+function AssessmentPageInner() {
+  const searchParams = useSearchParams();
   const [screen, setScreen] = useState<Screen>('welcome');
   const [answers, setAnswers] = useState<string[]>(Array(9).fill(''));
   const [results, setResults] = useState<Results | null>(null);
   const [contact, setContact] = useState({ firstName: '', email: '' });
+
+  useEffect(() => {
+    const r = searchParams.get('r');
+    if (!r) return;
+    try {
+      const decoded = JSON.parse(atob(r));
+      if (decoded.result) {
+        setResults(decoded.result);
+        setContact({ firstName: decoded.firstName ?? '', email: decoded.email ?? '' });
+        setScreen('results');
+      }
+    } catch {
+      // invalid param — ignore, stay on welcome screen
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleQuizComplete(finalAnswers: string[]) {
     setAnswers(finalAnswers);
@@ -35,6 +62,12 @@ export default function AssessmentPage() {
     const r = calculateResults(answers);
     setResults(r);
     setScreen('results');
+    // Fire-and-forget — send report email without blocking the UI
+    fetch('/api/send-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName, email, result: r }),
+    }).catch(() => {});
   }
 
   return (
@@ -168,6 +201,7 @@ function QuizScreen({ onComplete }: { onComplete: (answers: string[]) => void })
                         alignItems: 'center',
                         gap: 14,
                         padding: '14px 18px',
+                        minHeight: '44px',
                         borderRadius: 10,
                         border: `1.5px solid ${selected ? C.accent : 'rgba(255,255,255,0.1)'}`,
                         background: selected ? 'rgba(232,97,45,0.12)' : 'rgba(255,255,255,0.04)',
@@ -323,6 +357,7 @@ function ContactScreen({
 
 // ─── Results report ───────────────────────────────────────────────────────────
 function ResultsReport({ results, firstName }: { results: Results; firstName: string }) {
+  const { openCalendly } = useCalendly();
   const {
     readinessScore,
     maturityStage,
@@ -341,97 +376,46 @@ function ResultsReport({ results, firstName }: { results: Results; firstName: st
   const scoreColor = getScoreColor(readinessScore);
 
   return (
-    <div style={{ background: C.bg, minHeight: '100vh', padding: '40px 24px 80px', position: 'relative' }}>
-      {/* Haulage-themed background elements — low opacity road scene */}
-      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" viewBox="0 0 800 1600" style={{ opacity: 0.055 }}>
-          {/* ── Road stripes ── */}
-          <line x1="120" y1="0" x2="120" y2="1600" stroke="#1F2937" strokeWidth="2.5" strokeDasharray="20 14" />
-          <line x1="680" y1="0" x2="680" y2="1600" stroke="#1F2937" strokeWidth="2.5" strokeDasharray="20 14" />
-          {/* Center route guide */}
-          <line x1="400" y1="0" x2="400" y2="1600" stroke="#2D8B8B" strokeWidth="1" strokeDasharray="4 20" />
-
-          {/* ── Distance markers left ── */}
-          {([200, 500, 800, 1100] as number[]).map((y) => (
-            <g key={y}>
-              <circle cx="120" cy={y} r="5" fill="#E8612D" />
-              <line x1="120" y1={y} x2="138" y2={y} stroke="#1F2937" strokeWidth="1.5" />
-            </g>
-          ))}
-          {/* ── Distance markers right ── */}
-          {([350, 650, 950, 1250] as number[]).map((y) => (
-            <g key={y}>
-              <circle cx="680" cy={y} r="5" fill="#E8612D" />
-              <line x1="662" y1={y} x2="680" y2={y} stroke="#1F2937" strokeWidth="1.5" />
-            </g>
-          ))}
-
-          {/* ── Lorry A — large, right margin, facing LEFT (hero lorry) ── */}
-          <g transform="translate(790, 230) scale(-1, 1)">
-            <rect x="0" y="8" width="120" height="60" rx="4" fill="#1F2937" />
-            <rect x="120" y="24" width="54" height="44" rx="4" fill="#1F2937" />
-            <rect x="128" y="30" width="28" height="20" rx="2" fill="rgba(232,97,45,0.35)" />
-            <rect x="165" y="14" width="6" height="18" rx="2" fill="#1F2937" />
-            <circle cx="36" cy="76" r="18" fill="#374151" />
-            <circle cx="36" cy="76" r="8" fill="#6B7280" />
-            <circle cx="152" cy="76" r="18" fill="#374151" />
-            <circle cx="152" cy="76" r="8" fill="#6B7280" />
-          </g>
-          {/* Speed lines behind Lorry A (to its right = trailer end) */}
-          <line x1="792" y1="258" x2="820" y2="258" stroke="#1F2937" strokeWidth="2" strokeLinecap="round" />
-          <line x1="792" y1="272" x2="826" y2="272" stroke="#1F2937" strokeWidth="1.5" strokeLinecap="round" />
-          <line x1="792" y1="286" x2="818" y2="286" stroke="#1F2937" strokeWidth="1" strokeLinecap="round" />
-
-          {/* ── Lorry B — medium, left margin, facing RIGHT ── */}
-          <g transform="translate(15, 605) scale(0.6, 0.6)">
-            <rect x="0" y="8" width="120" height="60" rx="4" fill="#1F2937" />
-            <rect x="120" y="24" width="54" height="44" rx="4" fill="#1F2937" />
-            <rect x="128" y="30" width="28" height="20" rx="2" fill="rgba(232,97,45,0.35)" />
-            <rect x="165" y="14" width="6" height="18" rx="2" fill="#1F2937" />
-            <circle cx="36" cy="76" r="18" fill="#374151" />
-            <circle cx="36" cy="76" r="8" fill="#6B7280" />
-            <circle cx="152" cy="76" r="18" fill="#374151" />
-            <circle cx="152" cy="76" r="8" fill="#6B7280" />
-          </g>
-
-          {/* ── Lorry C — small, right margin, facing LEFT ── */}
-          <g transform="translate(785, 980) scale(-0.45, 0.45)">
-            <rect x="0" y="8" width="120" height="60" rx="4" fill="#1F2937" />
-            <rect x="120" y="24" width="54" height="44" rx="4" fill="#1F2937" />
-            <rect x="128" y="30" width="28" height="20" rx="2" fill="rgba(232,97,45,0.35)" />
-            <rect x="165" y="14" width="6" height="18" rx="2" fill="#1F2937" />
-            <circle cx="36" cy="76" r="18" fill="#374151" />
-            <circle cx="36" cy="76" r="8" fill="#6B7280" />
-            <circle cx="152" cy="76" r="18" fill="#374151" />
-            <circle cx="152" cy="76" r="8" fill="#6B7280" />
-          </g>
-
-          {/* ── Route arcs ── */}
-          <path d="M 0 1600 Q 400 700 800 0" fill="none" stroke="#2D8B8B" strokeWidth="1.5" strokeDasharray="10 16" />
-          <path d="M 150 0 Q 250 800 100 1600" fill="none" stroke="#2D8B8B" strokeWidth="1" strokeDasharray="5 20" opacity="0.5" />
-
-          {/* ── GPS waypoint — page midpoint ── */}
-          <circle cx="400" cy="800" r="6" fill="#E8612D" />
-          <circle cx="400" cy="800" r="14" fill="none" stroke="#2D8B8B" strokeWidth="1.5" />
-          <circle cx="400" cy="800" r="22" fill="none" stroke="#2D8B8B" strokeWidth="1" opacity="0.5" />
+    <div style={{ background: C.bg, minHeight: '100vh', position: 'relative' }}>
+      {/* Road background — behind cards (zIndex 0), content at zIndex 1 */}
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0, opacity: 0.13 }}>
+        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" viewBox="0 0 800 2400">
+          {/* Left road edge — starts top-left, snakes R→L→R→L→R */}
+          <path d="M 60 0 C 60 240 660 240 660 480 C 660 720 60 720 60 960 C 60 1200 660 1200 660 1440 C 660 1680 60 1680 60 1920 C 60 2160 660 2160 660 2400" fill="none" stroke="#E8612D" strokeWidth="4" />
+          {/* Right road edge */}
+          <path d="M 140 0 C 140 240 740 240 740 480 C 740 720 140 720 140 960 C 140 1200 740 1200 740 1440 C 740 1680 140 1680 140 1920 C 140 2160 740 2160 740 2400" fill="none" stroke="#E8612D" strokeWidth="4" />
+          {/* Centre dashes */}
+          <path d="M 100 0 C 100 240 700 240 700 480 C 700 720 100 720 100 960 C 100 1200 700 1200 700 1440 C 700 1680 100 1680 100 1920 C 100 2160 700 2160 700 2400" fill="none" stroke="#E8612D" strokeWidth="1.5" strokeDasharray="22 35" />
         </svg>
       </div>
-      <div style={{ maxWidth: 680, margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
+      {/* Header — full-width dark report banner */}
+      <div style={{ background: C.bgDark, position: 'relative', zIndex: 1 }}>
+        <div style={{
+          maxWidth: 680,
+          margin: '0 auto',
+          padding: '24px clamp(16px, 4vw, 28px) 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12,
+        }}>
           <div>
-            <div style={{ fontFamily: FONT, fontSize: '1.2rem', fontWeight: 800 }}>
+            <div style={{ fontFamily: FONT, fontSize: '1.3rem', fontWeight: 800 }}>
               <span style={{ color: C.accent }}>bye</span>
-              <span style={{ color: C.text }}>bye</span>
+              <span style={{ color: '#F5F2EF' }}>bye</span>
               <span style={{ color: C.accent }}>admin</span>
             </div>
-            <div style={{ fontSize: '0.78rem', color: C.textDim, marginTop: 2 }}>Fleet Automation Assessment Report</div>
+            <div style={{ fontSize: '0.78rem', color: 'rgba(245,242,239,0.5)', marginTop: 3 }}>Fleet Automation Assessment Report</div>
           </div>
-          <div style={{ fontSize: '0.78rem', color: C.textLight, fontFamily: MONO }}>
+          <div style={{ fontSize: '0.75rem', color: 'rgba(245,242,239,0.35)', fontFamily: MONO }}>
             {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
         </div>
+      </div>
+
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '28px 24px 80px', position: 'relative', zIndex: 1 }}>
 
         {firstName && (
           <p style={{ color: C.textMid, fontSize: '1.05rem', marginBottom: 24 }}>
@@ -440,7 +424,7 @@ function ResultsReport({ results, firstName }: { results: Results; firstName: st
         )}
 
         {/* ── Score + Savings hero ── */}
-        <div style={{ ...card, marginBottom: 20 }}>
+        <div style={{ ...card, marginBottom: 20, borderTop: `3px solid ${C.accent}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, marginBottom: 16 }}>
             {/* Left: gauge */}
             <div style={{ textAlign: 'center', padding: '12px 0' }}>
@@ -457,14 +441,17 @@ function ResultsReport({ results, firstName }: { results: Results; firstName: st
               </div>
             </div>
             {/* Right: savings numbers */}
-            <div style={{ background: C.bgDark, borderRadius: 12, padding: '28px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 24, textAlign: 'center' }}>
-              <SavingsStat label="Hours saved/week" value={totalWeeklyHoursSaved.toString()} color={C.teal} />
-              <SavingsStat label="Monthly savings" value={`£${totalMonthlySavings.toLocaleString()}`} color={C.accent} />
-              <SavingsStat label="Annual savings" value={`£${totalAnnualSavings.toLocaleString()}`} color="#F5F2EF" />
+            <div>
+              <div style={{ fontSize: '0.68rem', color: C.textDim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, textAlign: 'center' }}>Estimated Savings</div>
+              <div style={{ background: C.bgDark, borderRadius: 12, padding: '28px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 24, textAlign: 'center' }}>
+                <SavingsStat label="Hours saved/week" value={totalWeeklyHoursSaved.toString()} color={C.teal} />
+                <SavingsStat label="Monthly savings" value={`£${totalMonthlySavings.toLocaleString()}`} color={C.accent} />
+                <SavingsStat label="Annual savings" value={`£${totalAnnualSavings.toLocaleString()}`} color="#F5F2EF" />
+              </div>
             </div>
           </div>
           <p style={{ color: C.textMid, fontSize: '0.92rem', fontStyle: 'italic', margin: 0, textAlign: 'center', paddingTop: 16, borderTop: `1px solid ${C.borderLight}` }}>
-            Based on {vehicleCount} vehicles, you have {totalWeeklyHoursSaved} hours of recoverable admin time per week — equivalent to {adminEquivalent} admin role{adminEquivalent !== 1 ? 's' : ''} or {workingDaysEquivalent} working days a year.
+            Based on {vehicleCount} vehicles, you have {totalWeeklyHoursSaved} hours of recoverable admin time per week, equivalent to {adminEquivalent} admin role{adminEquivalent !== 1 ? 's' : ''} or {workingDaysEquivalent} working days a year.
           </p>
         </div>
 
@@ -601,12 +588,12 @@ function ResultsReport({ results, firstName }: { results: Results; firstName: st
             })}
           </div>
           <p style={{ fontSize: '0.88rem', color: C.textMid, margin: 0, textAlign: 'center', paddingTop: 16, borderTop: `1px solid ${C.borderLight}` }}>
-            85% of UK fleet operators are still fully manual. You&apos;re at Stage {maturityStage} — {MATURITY_STAGES[maturityStage - 1]?.label}.
+            85% of UK fleet operators are still fully manual. You&apos;re at Stage {maturityStage}: {MATURITY_STAGES[maturityStage - 1]?.label}.
           </p>
         </div>
 
         {/* ── CTA ── */}
-        <div style={{ ...card, textAlign: 'center', padding: '40px 28px' }}>
+        <div style={{ ...card, textAlign: 'center', padding: '40px 28px', borderTop: `3px solid ${C.accent}` }}>
           <h3 style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 900, color: C.text, margin: '0 0 12px' }}>
             Ready to recover those hours?
           </h3>
@@ -614,9 +601,7 @@ function ResultsReport({ results, firstName }: { results: Results; firstName: st
             15-minute call. I&apos;ll tell you honestly whether AI automation would make sense for your operation right now.
           </p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
-            <a href="https://calendly.com/byebyeadmin/15min" target="_blank" rel="noopener noreferrer">
-              <Btn primary style={{ fontSize: '1rem', padding: '14px 36px' }}>Book a Free 15-Minute Call →</Btn>
-            </a>
+            <Btn primary onClick={openCalendly} style={{ fontSize: '1rem', padding: '14px 36px' }}>Book a Free 15-Minute Call →</Btn>
             <Link href="/"><Btn>Back to Home</Btn></Link>
           </div>
           <p style={{ fontSize: '0.78rem', color: C.textLight }}>No obligation. No sales pitch. George answers personally.</p>
@@ -667,7 +652,7 @@ const card: React.CSSProperties = {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontFamily: FONT, fontSize: '0.75rem', color: C.accent, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+    <div style={{ fontFamily: FONT, fontSize: '0.85rem', color: C.accent, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16, borderLeft: `3px solid ${C.accent}`, paddingLeft: 10 }}>
       {children}
     </div>
   );

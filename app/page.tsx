@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { HeroScroll } from '@/components/HeroScroll';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { AgentShowcaseScroll } from '@/components/AgentShowcaseScroll';
 import { FAQSection } from '@/components/FAQSection';
-import { Fade, Btn, Section, Card, H2, P, Strong } from '@/components/ui';
+import { DemosSection } from '@/components/DemosSection';
+import { Fade, Btn, Section, H2, P, Tag } from '@/components/ui';
 import { C, FONT } from '@/lib/constants';
 import Link from 'next/link';
+import { useCalendly } from '@/lib/calendly-context';
 
 // Dynamic imports for canvas-heavy components (browser-only)
 const CTAParticleCanvas = dynamic(
@@ -16,8 +18,101 @@ const CTAParticleCanvas = dynamic(
   { ssr: false, loading: () => null }
 );
 
+// ── Typewriter one-liner ───────────────────────────────────────────────────────
+const FULL_TEXT = 'We use AI automation to do your admin for you.';
+// Split into plain + highlighted segments
+const HIGHLIGHT_START = 'We use AI automation to do your ';
+const HIGHLIGHT_WORD  = 'admin';
+const HIGHLIGHT_END   = ' for you.';
+
+function TypewriterOneLiner() {
+  const [typed, setTyped] = useState('');
+  const [done, setDone]   = useState(false);
+  const ref               = useRef<HTMLDivElement>(null);
+  const started           = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !started.current) {
+          started.current = true;
+          observer.disconnect();
+          let i = 0;
+          const interval = setInterval(() => {
+            i++;
+            setTyped(FULL_TEXT.slice(0, i));
+            if (i >= FULL_TEXT.length) {
+              clearInterval(interval);
+              setDone(true);
+            }
+          }, 38);
+        }
+      },
+      { threshold: 0.4 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Render typed text with highlight on the "haulage admin" segment
+  function renderTyped(t: string) {
+    const hsLen = HIGHLIGHT_START.length;
+    const hwLen = HIGHLIGHT_START.length + HIGHLIGHT_WORD.length;
+
+    if (t.length <= hsLen) {
+      return <>{t}</>;
+    } else if (t.length <= hwLen) {
+      return (
+        <>
+          {HIGHLIGHT_START}
+          <span style={{ color: C.accent }}>{t.slice(hsLen)}</span>
+        </>
+      );
+    } else {
+      return (
+        <>
+          {HIGHLIGHT_START}
+          <span style={{ color: C.accent }}>{HIGHLIGHT_WORD}</span>
+          {t.slice(hwLen)}
+        </>
+      );
+    }
+  }
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline' }}>
+      <style>{`
+        @keyframes cursorBlink {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0; }
+        }
+      `}</style>
+      {renderTyped(typed)}
+      {!done && (
+        <span
+          style={{
+            display: 'inline-block',
+            width: 3,
+            height: '0.85em',
+            background: C.accent,
+            marginLeft: 3,
+            verticalAlign: 'middle',
+            borderRadius: 1,
+            animation: 'cursorBlink 0.7s step-end infinite',
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [heroReady, setHeroReady] = useState(false);
+  const { openCalendly } = useCalendly();
 
   return (
     <div>
@@ -26,92 +121,51 @@ export default function HomePage() {
       {/* ── 3D scroll-driven hero (500vh tall) ── */}
       <HeroScroll onReady={() => setHeroReady(true)} />
 
-      {/* ── Agent showcase intro ── */}
-      <div style={{ background: C.bg }}>
-        <Section style={{ textAlign: 'center', paddingBottom: 0 }}>
-          <Fade>
-            <H2>Six things we automate. While you handle the fleet.</H2>
-          </Fade>
-          <Fade delay={0.05}>
-            <P style={{ color: C.textMid, marginBottom: 0 }}>Each one is a piece of admin your team currently does by hand.</P>
-          </Fade>
-        </Section>
+      {/* ── One-liner clarity statement ── */}
+      <div style={{
+        background: C.bgWhite,
+        borderTop: `1px solid ${C.border}`,
+        borderBottom: `2px solid ${C.border}`,
+      }}>
+        <div
+          style={{
+            padding: '68px 5% 48px',
+            textAlign: 'left',
+          }}
+        >
+          <div style={{ marginBottom: 10 }}>
+            <Tag>What we do</Tag>
+          </div>
+          <p
+            style={{
+              fontFamily: FONT,
+              fontSize: 'clamp(1.65rem, 4.2vw, 2.6rem)',
+              fontWeight: 900,
+              color: C.text,
+              lineHeight: 1.25,
+              letterSpacing: '-0.02em',
+              margin: '0 0 12px',
+            }}
+          >
+            <TypewriterOneLiner />
+          </p>
+          <p style={{
+            fontFamily: FONT,
+            fontSize: 'clamp(0.78rem, 1.6vw, 0.9rem)',
+            color: C.textMid,
+            margin: 0,
+            fontWeight: 400,
+          }}>
+            No new software to learn. No extra headcount. Just less admin.
+          </p>
+        </div>
       </div>
 
       {/* ── Agent showcase — 400vh sticky scroll ── */}
       <AgentShowcaseScroll />
 
-      {/* ── VSL placeholder ── */}
-      <div style={{ background: C.bgWhite }}>
-        <Section style={{ textAlign: 'center' }}>
-          <Fade>
-            <H2>Why we built this. And why it works for fleets your size.</H2>
-          </Fade>
-          <Fade delay={0.05}>
-            <P style={{ color: C.textMid, marginBottom: 28 }}>3 minutes. Plain English.</P>
-          </Fade>
-          <Fade delay={0.1}>
-            <div style={{
-              maxWidth: 800, margin: '0 auto 24px',
-              aspectRatio: '16/9', background: C.bg,
-              border: `2px dashed ${C.border}`, borderRadius: 12,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexDirection: 'column', gap: 12,
-            }}>
-              <div style={{ fontSize: '2.5rem', color: C.textDim }}>▶</div>
-              <P style={{ color: C.textDim, margin: 0, fontSize: '0.9rem' }}>
-                Video coming soon — replace with Vimeo embed (autoplay:off, captions:on)
-              </P>
-            </div>
-          </Fade>
-          <Fade delay={0.15}>
-            <P style={{ color: C.textDim, fontStyle: 'italic', fontSize: '0.9rem' }}>
-              Or skip ahead — take the free assessment and get your numbers in 2 minutes.
-            </P>
-          </Fade>
-          <Fade delay={0.2}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 10,
-              background: C.tealDim,
-              border: `1px solid ${C.tealBorder}`,
-              borderRadius: 8,
-              padding: '10px 18px',
-              marginTop: 24,
-            }}>
-              <span style={{ color: C.teal, fontWeight: 800, fontSize: '1rem' }}>✓</span>
-              <span style={{ fontFamily: FONT, color: C.teal, fontWeight: 700, fontSize: '0.92rem' }}>
-                Built by someone who came from your industry. Not a tech startup.
-              </span>
-            </div>
-          </Fade>
-        </Section>
-      </div>
-
-      {/* ── Cost question ── */}
-      <div data-section="cost" style={{ background: C.bg }}>
-        <Section>
-          <Fade>
-            <H2>Does the cost stack up?</H2>
-          </Fade>
-          <Fade delay={0.1}>
-            <Card style={{ borderLeft: `4px solid ${C.accent}` }}>
-              <P>
-                Your admin person costs around £15/hour all-in. At 30 hours a week on order entry, invoicing, and
-                portal-checking, that&apos;s roughly £1,800 a month for work that doesn&apos;t need a human brain.
-              </P>
-              <P>
-                AI automation handling that same work costs around a third of that.{' '}
-                <Strong>Your admin person keeps their job — they just stop doing the part that was wasting their time.</Strong>
-              </P>
-              <P style={{ color: C.textMid, fontStyle: 'italic', marginBottom: 0 }}>
-                Nothing goes live until you&apos;ve watched it working on your real jobs. The risk sits with us.
-              </P>
-            </Card>
-          </Fade>
-        </Section>
-      </div>
+      {/* ── Demos ── */}
+      <DemosSection />
 
       {/* ── FAQ section ── */}
       <FAQSection />
@@ -126,7 +180,7 @@ export default function HomePage() {
             <h2
               style={{
                 fontFamily: FONT,
-                fontSize: '2.2rem',
+                fontSize: 'clamp(1.6rem, 5vw, 2.2rem)',
                 fontWeight: 900,
                 color: '#F5F2EF',
                 margin: '0 0 32px',
@@ -139,9 +193,7 @@ export default function HomePage() {
               <Link href="/assessment">
                 <Btn primary>Take the Free Assessment →</Btn>
               </Link>
-              <Link href="/contact">
-                <Btn style={{ color: '#F5F2EF', borderColor: 'rgba(245,242,239,0.3)' }}>Book a 15-Minute Call</Btn>
-              </Link>
+              <Btn onClick={openCalendly} style={{ color: '#F5F2EF', borderColor: 'rgba(245,242,239,0.3)' }}>Book a 15-Minute Call</Btn>
             </div>
           </Fade>
         </Section>

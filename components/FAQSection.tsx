@@ -7,7 +7,7 @@ import { C, FONT } from '@/lib/constants';
 const FAQS = [
   {
     q: 'What does this actually cost?',
-    a: "Honestly, it varies depending on your operation — the size of your fleet, how many processes we're automating, and how complex your current setup is. What I can tell you is that for most operators, the system pays for itself within the first few months just from the admin hours it frees up. The free assessment gives you a clear picture of the numbers before any conversation about cost happens. I'm not going to quote you something without actually understanding your operation first.",
+    a: "Honestly, it varies depending on your operation: the size of your fleet, how many processes we're automating, and how complex your current setup is. What I can tell you is that for most operators, the system pays for itself within the first few months just from the admin hours it frees up. The free assessment gives you a clear picture of the numbers before any conversation about cost happens. I'm not going to quote you something without actually understanding your operation first.",
   },
   {
     q: 'What if the AI makes a mistake?',
@@ -23,15 +23,15 @@ const FAQS = [
   },
   {
     q: 'What happens to my admin staff?',
-    a: "This comes up a lot, and I want to be straight about it. The goal isn't to get rid of your team. It's to stop them spending their days on data entry and repetitive tasks that frankly aren't a good use of anyone's time. The operators I work with tend to find that their admin people end up doing more valuable work — customer relationships, problem-solving, handling the jobs that actually need a human. What you do with the capacity is up to you. Some operators grow their volume without adding headcount. Some redeploy people into other parts of the business. That's a conversation worth having once you know what the automation can actually do for you.",
+    a: "This comes up a lot, and I want to be straight about it. The goal isn't to get rid of your team. It's to stop them spending their days on data entry and repetitive tasks that frankly aren't a good use of anyone's time. The operators I work with tend to find that their admin people end up doing more valuable work: customer relationships, problem-solving, handling the jobs that actually need a human. What you do with the capacity is up to you. Some operators grow their volume without adding headcount. Some redeploy people into other parts of the business. That's a conversation worth having once you know what the automation can actually do for you.",
   },
   {
     q: "I've tried software before and it didn't stick. Why is this different?",
-    a: "Because most software still requires your team to work inside it. It moves the admin around rather than actually removing it. What we've built doesn't ask your team to change how they work — it works in the background and handles the tasks automatically. Your team interacts with it when something needs a decision, not to do the data entry. That's the fundamental difference, and it's why it tends to stick where other things haven't.",
+    a: "Because most software still requires your team to work inside it. It moves the admin around rather than actually removing it. What we've built doesn't ask your team to change how they work. It works in the background and handles the tasks automatically. Your team interacts with it when something needs a decision, not to do the data entry. That's the fundamental difference, and it's why it tends to stick where other things haven't.",
   },
   {
     q: 'How long does it take to get set up?',
-    a: "Usually six to eight weeks from the initial conversation to the system running on its own. The first four weeks are learning mode — it watches, doesn't touch anything, and your team carries on as normal. Weeks five to eight are review mode — it starts processing, your team checks every output. By week nine, it's handling the jobs it's confident on autonomously. It's a deliberate pace because rushing it doesn't serve anyone.",
+    a: "Usually six to eight weeks from the initial conversation to the system running on its own. The first four weeks are learning mode: it watches, doesn't touch anything, and your team carries on as normal. Weeks five to eight are review mode: it starts processing, your team checks every output. By week nine, it's handling the jobs it's confident on autonomously. It's a deliberate pace because rushing it doesn't serve anyone.",
   },
   {
     q: 'Do I have to sign a long contract?',
@@ -43,7 +43,7 @@ const FAQS = [
   },
   {
     q: "What if I'm not sure it's right for me yet?",
-    a: "That's completely fine — that's what the free assessment and the fifteen-minute call are for. Take the assessment, get your numbers, and if you want to talk it through, book a call. I'll give you an honest view of whether I think it makes sense for your operation. If I don't think it does, I'll tell you that. There's no pressure and no pitch. Just a conversation.",
+    a: "That's completely fine. That's what the free assessment and the fifteen-minute call are for. Take the assessment, get your numbers, and if you want to talk it through, book a call. I'll give you an honest view of whether I think it makes sense for your operation. If I don't think it does, I'll tell you that. There's no pressure and no pitch. Just a conversation.",
   },
 ];
 
