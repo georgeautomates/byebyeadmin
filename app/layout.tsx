@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Nunito_Sans, JetBrains_Mono } from 'next/font/google';
+import { Nunito_Sans, JetBrains_Mono, Outfit } from 'next/font/google';
 import './globals.css';
 import { Nav } from '@/components/Nav';
 import { Footer } from '@/components/Footer';
@@ -18,6 +18,13 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-mono',
+  display: 'swap',
+});
+
+const outfit = Outfit({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800', '900'],
+  variable: '--font-outfit',
   display: 'swap',
 });
 
@@ -40,7 +47,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${nunitoSans.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${nunitoSans.variable} ${jetbrainsMono.variable} ${outfit.variable}`}>
       <head>
         <Script
           id="gtm-script"
@@ -52,6 +59,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
             })(window,document,'script','dataLayer','GTM-NFX2T4BT');`,
           }}
+        />
+        <Script
+          id="vtag-ai-js"
+          async
+          src="https://r2.leadsy.ai/tag.js"
+          data-pid="s7wcRIKsfE6YFH3r"
+          data-version="062024"
         />
       </head>
       <body>
