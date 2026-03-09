@@ -1115,7 +1115,7 @@ export function ThreeHero({ containerRef, onPinsUpdate, onReady }: ThreeHeroProp
         clearTimeout(readyFallback);
         callOnReady();
         // ── Intro camera rise — fires as loading screen fades out ──────────
-        gsap.to(cam, { y: 5.5, ly: 2.0, duration: 1.5, ease: 'power2.inOut', delay: 0.6 });
+        gsap.to(cam, { y: 5.5, ly: 2.0, ...(isMobile ? { x: -5.0 } : {}), duration: 1.5, ease: 'power2.inOut', delay: 0.6 });
       })
       .catch(() => { callOnReady(); /* model load failed — fire ready anyway */ });
 
@@ -1355,9 +1355,9 @@ export function ThreeHero({ containerRef, onPinsUpdate, onReady }: ThreeHeroProp
     // cam.z = -7.0 → camera at world z = 7.0 + (-7.0) = 0, which is ahead of lorry.
     // cam.lz = -1.4 → look-at z = 7.0 + (-1.4) = 5.6 = lorry's front face.
     const cam = {
-      x: -2.0, y: 3.5, z: -11.0,      // intro start: cab-height view showing the front face
-      lx: -0.6, ly: 1.2, lz: -3.5,    // look-at aimed at grille / lower front face
-      fov: isMobile ? 62 : 52,
+      x: isMobile ? -4.5 : -2.0, y: 3.5, z: isMobile ? -13.0 : -11.0,   // intro start: cab-height view showing the front face
+      lx: isMobile ? -1.0 : -0.6, ly: 1.2, lz: isMobile ? -5.5 : -3.5, // look-at aimed at grille / lower front face
+      fov: isMobile ? 72 : 52,
       bloom: 0.3,
       morph: 0,
       bgT: 1,               // always light scene
@@ -1396,16 +1396,16 @@ export function ThreeHero({ containerRef, onPinsUpdate, onReady }: ThreeHeroProp
         });
 
         // Act 0→1 (0–16%): dramatic 180° orbit from face-on → 3/4 following shot
-        tl.to(cam, { lorryT: 0.08, x: 4.0, y: 6.0, z: 9.0, lx: 0, ly: 2.0, lz: -3.0, fov: 62, bloom: 0.3, duration: 0.16 }, 0);
+        tl.to(cam, { lorryT: 0.08, x: 4.0, y: 6.0, z: 9.0, lx: 0, ly: 2.0, lz: -3.0, fov: isMobile ? 72 : 62, bloom: 0.3, duration: 0.16 }, 0);
 
         // Act 1→2 (16–33%): following shot, mini-map appears, first stops reveal
         tl.to(cam, { lorryT: 0.25, x: 3.5, y: 5.0, z: 9.0, lx: 0, ly: 1.5, lz: -2.0, fov: 61, bloom: 0.3, morph: 0.25, miniMapOpacity: 1, duration: 0.17 }, 0.16);
 
         // Act 2→3 (33–50%): activation close-up
-        tl.to(cam, { lorryT: 0.44, x: 2.0, y: 3.5, z: 3.0, lx: 0, ly: 2.5, lz: 0.0, fov: 50, bloom: 0.3, morph: 0.95, duration: 0.17 }, 0.33);
+        tl.to(cam, { lorryT: 0.44, x: 2.0, y: isMobile ? 5.5 : 3.5, z: isMobile ? 8.0 : 3.0, lx: 0, ly: isMobile ? 2.0 : 2.5, lz: isMobile ? -1.0 : 0.0, fov: isMobile ? 65 : 50, bloom: 0.3, morph: 0.95, duration: 0.17 }, 0.33);
 
         // Act 3→4 (50–68%): side tracking shot
-        tl.to(cam, { lorryT: 0.63, x: -9.0, y: 4.0, z: -1.0, lx: 2.5, ly: 1.5, lz: -3.0, fov: 60, bloom: 0.2, morph: 1.0, duration: 0.18 }, 0.50);
+        tl.to(cam, { lorryT: 0.63, x: isMobile ? -14.0 : -9.0, y: isMobile ? 6.0 : 4.0, z: isMobile ? 2.0 : -1.0, lx: 2.5, ly: 1.5, lz: -3.0, fov: isMobile ? 68 : 60, bloom: 0.2, morph: 1.0, duration: 0.18 }, 0.50);
 
         // Act 4→5 (68–85%): pull-back
         tl.to(cam, { lorryT: 0.83, x: 5.0, y: 9.0, z: 10.0, lx: 0, ly: 1.0, lz: -2.0, fov: 67, bloom: 0.1, duration: 0.17 }, 0.68);
@@ -1538,6 +1538,7 @@ export function ThreeHero({ containerRef, onPinsUpdate, onReady }: ThreeHeroProp
       // ── Lorry collision clamp — keep camera outside lorry bounding box ─────
       if (lorryBbox) {
         const pad     = 0.35;
+        const topPad  = 0.7;   // extra clearance above lorry roof
         const angle   = lorryRef.current.rotation.y;
         const cosA    = Math.cos(-angle);
         const sinA    = Math.sin(-angle);
@@ -1550,22 +1551,30 @@ export function ThreeHero({ containerRef, onPinsUpdate, onReady }: ThreeHeroProp
         const camRelY = camera.position.y - ROUTE_Y;
         const inX = Math.abs(localX) < hx;
         const inZ = Math.abs(localZ) < hz;
-        const inY = camRelY > -pad && camRelY < lorryBbox.height + pad;
+        const inY = camRelY > -pad && camRelY < lorryBbox.height + topPad;
         if (inX && inZ && inY) {
-          const overlapX = hx - Math.abs(localX);
-          const overlapZ = hz - Math.abs(localZ);
+          const overlapX    = hx - Math.abs(localX);
+          const overlapZ    = hz - Math.abs(localZ);
+          const overlapYTop = (lorryBbox.height + topPad) - camRelY;
+          const overlapYBot = camRelY + pad;
+          const overlapY    = Math.min(overlapYTop, overlapYBot);
           const signX = localX >= 0 ? 1 : -1;
           const signZ = localZ >= 0 ? 1 : -1;
-          let newLocalX = localX, newLocalZ = localZ;
-          if (overlapX <= overlapZ) {
-            newLocalX = hx * signX;   // push out sideways (shorter path)
+          if (overlapY <= overlapX && overlapY <= overlapZ) {
+            // Entered from top — push camera above lorry roof
+            camera.position.y = ROUTE_Y + lorryBbox.height + topPad;
           } else {
-            newLocalZ = hz * signZ;   // push out front/back (shorter path)
+            let newLocalX = localX, newLocalZ = localZ;
+            if (overlapX <= overlapZ) {
+              newLocalX = hx * signX;   // push out sideways (shorter path)
+            } else {
+              newLocalZ = hz * signZ;   // push out front/back (shorter path)
+            }
+            const cosB = Math.cos(angle);
+            const sinB = Math.sin(angle);
+            camera.position.x = lorryPt.x + cosB * newLocalX - sinB * newLocalZ;
+            camera.position.z = lorryPt.z + sinB * newLocalX + cosB * newLocalZ;
           }
-          const cosB = Math.cos(angle);
-          const sinB = Math.sin(angle);
-          camera.position.x = lorryPt.x + cosB * newLocalX - sinB * newLocalZ;
-          camera.position.z = lorryPt.z + sinB * newLocalX + cosB * newLocalZ;
         }
       }
 
@@ -1622,7 +1631,7 @@ export function ThreeHero({ containerRef, onPinsUpdate, onReady }: ThreeHeroProp
         const dist  = cam.lorryT - stop.t;
 
         // FIX 3: reveal stops when lorry is within 20% of route ahead of them
-        if (!state.visible && dist > -0.20) { state.visible = true; }
+        if (!state.visible && cam.lorryT > 0 && dist > -0.20) { state.visible = true; }
         state.group.visible = state.visible;
 
         if (!state.completed && dist > 0.05) {

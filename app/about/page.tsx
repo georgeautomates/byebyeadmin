@@ -55,6 +55,33 @@ export default function AboutPage() {
   return (
     <div style={{ paddingTop: 80 }}>
 
+      {/* ── Definition banner ── */}
+      <div style={{ background: C.bgDark }}>
+        <div
+          style={{
+            maxWidth: 900,
+            margin: '0 auto',
+            padding: 'clamp(28px, 4vw, 44px) clamp(16px, 5vw, 24px)',
+            textAlign: 'center',
+          }}
+        >
+          <p
+            style={{
+              fontFamily: FONT,
+              fontSize: 'clamp(1rem, 2.5vw, 1.25rem)',
+              fontWeight: 700,
+              color: 'rgba(245,242,239,0.9)',
+              lineHeight: 1.55,
+              margin: 0,
+            }}
+          >
+            Bye Bye Admin is{' '}
+            <span style={{ color: C.accent }}>the AI automation partner for UK haulage operators.</span>
+            {' '}We automate the back-office so you can run the fleet.
+          </p>
+        </div>
+      </div>
+
       {/* ── Section A: Founder story ── */}
       <div style={{ background: C.bg }}>
         <div

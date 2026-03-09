@@ -1,10 +1,10 @@
 'use client';
 
-import { forwardRef, useEffect, useRef, useState } from 'react';
+import { Fragment, forwardRef, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { C, FONT } from '@/lib/constants';
+import { C, FONT, MONO } from '@/lib/constants';
 import Link from 'next/link';
 import { useCalendly } from '@/lib/calendly-context';
 
@@ -32,7 +32,6 @@ interface Act {
 const ACTS: Act[] = [
   {
     id: 'act-0',
-    badge: 'For UK Haulage Operators · 3–100 Vehicles',
     headline: 'Your back office is the hardest-working part of your fleet.',
     highlight: 'And it\u2019s done manually.',
     sub: 'Orders typed by hand. Invoices chased. Portals checked every hour. That\u2019s about to change.',
@@ -171,7 +170,7 @@ export function HeroScroll({ onReady }: { onReady?: () => void }) {
         if (!el) return;
         const isLastAct = i === ACTS.length - 1;
         const [start, end] = [
-          mobile && isLastAct ? 0.75 : act.show[0],
+          mobile && isLastAct ? 0.84 : act.show[0],
           act.show[1],
         ];
 
@@ -205,20 +204,22 @@ export function HeroScroll({ onReady }: { onReady?: () => void }) {
     // 500vh desktop / 550vh mobile — extra height ensures Act 5 has ~88vh dwell before section ends
     <div ref={containerRef} style={{ position: 'relative', height: isMobile ? '550vh' : '500vh' }}>
 
-      {/* Route progress bar — sticky sibling, outside overflow:hidden viewport */}
-      <div
-        style={{
-          position: 'sticky',
-          top: 76,
-          height: 0,
-          zIndex: 100,
-          opacity: barOpacity,
-          pointerEvents: barOpacity < 0.05 ? 'none' : 'auto',
-          transition: 'opacity 0.1s ease',
-        }}
-      >
-        <RouteProgressBar currentAct={currentAct} onActClick={scrollToAct} />
-      </div>
+      {/* Route progress bar — sticky sibling, outside overflow:hidden viewport (desktop only) */}
+      {!isMobile && (
+        <div
+          style={{
+            position: 'sticky',
+            top: 76,
+            height: 0,
+            zIndex: 100,
+            opacity: barOpacity,
+            pointerEvents: barOpacity < 0.05 ? 'none' : 'auto',
+            transition: 'opacity 0.1s ease',
+          }}
+        >
+          <RouteProgressBar currentAct={currentAct} onActClick={scrollToAct} isMobile={isMobile} />
+        </div>
+      )}
 
       {/* Sticky viewport */}
       <div
@@ -228,6 +229,7 @@ export function HeroScroll({ onReady }: { onReady?: () => void }) {
           height: '100dvh',
           overflow: 'hidden',
           background: '#0F1419',
+          zIndex: 99,
         }}
       >
         {/* Three.js hero — lorry on curved route with 6-act camera */}
@@ -257,6 +259,19 @@ export function HeroScroll({ onReady }: { onReady?: () => void }) {
           }}
         />
 
+        {/* Mobile top gradient — cream zone for text, lorry visible below */}
+        {isMobile && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(to bottom, rgba(245,242,239,1.0) 0%, rgba(245,242,239,1.0) 48%, rgba(245,242,239,0.0) 65%)',
+              zIndex: 4,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+
         {/* Text acts — left-aligned at ~8% from left */}
         <div
           style={{
@@ -264,9 +279,10 @@ export function HeroScroll({ onReady }: { onReady?: () => void }) {
             inset: 0,
             zIndex: 10,
             display: 'flex',
-            alignItems: 'center',
+            alignItems: isMobile ? 'flex-start' : 'center',
             justifyContent: 'flex-start',
             paddingLeft: '8%',
+            paddingTop: isMobile ? '16dvh' : 0,
           }}
         >
           {ACTS.map((act, i) => {
@@ -286,9 +302,10 @@ export function HeroScroll({ onReady }: { onReady?: () => void }) {
                   maxWidth: 'min(600px, 88vw)',
                   textAlign: 'left',
                   willChange: 'opacity, transform',
+                  pointerEvents: i === currentAct ? 'auto' : 'none',
                 }}
               >
-                {act.badge && (
+                {act.badge && !isMobile && (
                   <div style={{
                     display: 'inline-block',
                     fontFamily: FONT,
@@ -371,179 +388,110 @@ export function HeroScroll({ onReady }: { onReady?: () => void }) {
 
 // ── Route progress bar ────────────────────────────────────────────────────────
 
-function buildWavyPath(width: number, y: number): string {
-  const n = ACTS.length - 1;
-  const seg = width / n;
-  const amp = 10;
-  let d = `M 0,${y}`;
-  for (let i = 0; i < n; i++) {
-    const x1 = (i + 1) * seg;
-    const cpX = i * seg + seg * 0.5;
-    const cpY = y + (i % 2 === 0 ? -amp : amp);
-    d += ` C ${cpX},${cpY} ${cpX},${cpY} ${x1},${y}`;
-  }
-  return d;
-}
-
 function RouteProgressBar({
   currentAct,
   onActClick,
+  isMobile,
 }: {
   currentAct: number;
   onActClick: (i: number) => void;
+  isMobile: boolean;
 }) {
-  const Y = 22;
-  const SVG_H = 56;
   const [hoveredStop, setHoveredStop] = useState<number | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [svgWidth, setSvgWidth] = useState(400);
-
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => setSvgWidth(entry.contentRect.width));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const stops = ACTS.map((_, i) => (i / (ACTS.length - 1)) * svgWidth);
-  const wavyD = buildWavyPath(svgWidth, Y);
 
   return (
-    <div
-      ref={wrapRef}
-      style={{ position: 'absolute', top: 0, left: 80, right: 80, zIndex: 11 }}
-    >
+    <div style={{ position: 'absolute', top: 0, left: isMobile ? 16 : 80, right: isMobile ? 16 : 80, zIndex: 11 }}>
       <style>{`
-        @keyframes dashMove { to { stroke-dashoffset: -24; } }
-        @keyframes stopPulse {
-          0%   { transform: scale(0.6); opacity: 0.6; }
-          100% { transform: scale(2.2); opacity: 0; }
+        @keyframes dotPulse {
+          0%   { box-shadow: 0 0 0 0 rgba(232,97,45,0.45); }
+          70%  { box-shadow: 0 0 0 9px rgba(232,97,45,0); }
+          100% { box-shadow: 0 0 0 0 rgba(232,97,45,0); }
         }
       `}</style>
 
-      {/* SVG — viewBox matches exact pixel dimensions, scale always 1.0 */}
-      <svg
-        viewBox={`0 0 ${svgWidth} ${SVG_H}`}
-        style={{ width: '100%', height: SVG_H, overflow: 'visible', display: 'block' }}
-      >
-        {/* Layer 1: faint grey track */}
-        <path d={wavyD} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="2.5" />
-
-        {/* Layer 2: animated orange route dashes */}
-        <path
-          d={wavyD}
-          fill="none"
-          stroke="rgba(232,97,45,0.65)"
-          strokeWidth="3.5"
-          strokeDasharray="8 6"
-          style={{ animation: 'dashMove 0.9s linear infinite' }}
-        />
-
-        {stops.map((x, i) => {
+      <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+        {ACTS.map((act, i) => {
           const isActive  = i === currentAct;
           const isVisited = i < currentAct;
           const isHovered = hoveredStop === i;
-          const act       = ACTS[i];
 
-          // Node radius
-          const dotR = isActive ? 10 : isHovered && !isActive ? 9.5 : isVisited ? 8 : 6;
+          const dotSize   = isActive ? (isMobile ? 14 : 18) : isHovered && !isActive ? (isMobile ? 11 : 14) : (isMobile ? 9 : 12);
+          const dotBg     = isActive ? C.accent : isVisited ? C.teal : 'transparent';
+          const dotBorder = !isActive && !isVisited
+            ? '1.5px solid rgba(255,255,255,0.25)'
+            : 'none';
+          const dotShadow = isActive
+            ? undefined // handled by animation
+            : isVisited
+              ? '0 0 0 3px rgba(45,139,139,0.18)'
+              : isHovered
+                ? '0 0 0 4px rgba(232,97,45,0.15)'
+                : 'none';
 
-          // Label styles by state
-          const labelFill = isActive
-            ? '#2D8B8B'
+          const labelColor = isActive
+            ? 'rgba(255,255,255,0.95)'
             : isHovered && !isActive
-              ? '#2D8B8B'
+              ? 'rgba(255,255,255,0.75)'
               : isVisited
-                ? 'rgba(45,139,139,0.55)'
-                : 'rgba(255,255,255,0.22)';
-          const labelSize = isActive || (isHovered && !isActive) ? '8.5' : isVisited ? '8' : '7.5';
-          const labelWeight = isActive || (isHovered && !isActive) ? '800' : isVisited ? '700' : '600';
-          const labelSpacing = isActive || (isHovered && !isActive) ? '0.12em' : isVisited ? '0.1em' : '0.08em';
+                ? 'rgba(45,139,139,0.85)'
+                : 'rgba(255,255,255,0.32)';
 
           return (
-            <g
-              key={i}
-              onClick={() => onActClick(i)}
-              onMouseEnter={() => setHoveredStop(i)}
-              onMouseLeave={() => setHoveredStop(null)}
-              style={{ cursor: 'pointer' }}
-            >
-              {/* Hit area */}
-              <circle cx={x} cy={Y} r={16} fill="transparent" />
-
-              {/* Pulse ring — active only */}
-              {isActive && (
-                <circle
-                  cx={x} cy={Y} r={18}
-                  style={{
-                    fill: 'rgba(45,139,139,0.15)',
-                    transformBox: 'fill-box' as React.CSSProperties['transformBox'],
-                    transformOrigin: 'center',
-                    animation: 'stopPulse 2s ease-out infinite',
-                  }}
-                />
-              )}
-
-              {/* Glow ring — active only */}
-              {isActive && (
-                <circle
-                  cx={x} cy={Y} r={14}
-                  fill="none"
-                  stroke="rgba(45,139,139,0.35)"
-                  strokeWidth="1.5"
-                  style={{ filter: 'blur(2px)' }}
-                />
-              )}
-
-              {/* Hover ring — hovered non-active */}
-              {isHovered && !isActive && (
-                <circle cx={x} cy={Y} r={14} fill="none"
-                  stroke="rgba(45,139,139,0.3)" strokeWidth="1.5"
-                  style={{ filter: 'blur(1px)' }}
-                />
-              )}
-
-              {/* Main dot */}
-              <circle
-                cx={x} cy={Y} r={dotR}
-                fill={isActive || isVisited || isHovered ? (isHovered && !isActive ? 'rgba(45,139,139,0.9)' : '#2D8B8B') : 'none'}
-                stroke={!isActive && !isVisited && !isHovered ? 'rgba(45,139,139,0.28)' : 'none'}
-                strokeWidth={1.5}
-                opacity={isVisited && !isActive && !isHovered ? 0.65 : 1}
-                style={isActive
-                  ? { filter: 'drop-shadow(0 0 12px rgba(45,139,139,1)) drop-shadow(0 0 4px rgba(45,139,139,0.9))' }
-                  : isHovered && !isActive
-                    ? { filter: 'drop-shadow(0 0 7px rgba(45,139,139,0.7))' }
-                    : {}}
-              />
-
-              {/* Inner highlight — active only, gives lit/3D look */}
-              {isActive && (
-                <circle
-                  cx={x - 2} cy={Y - 2} r={3.5}
-                  fill="rgba(255,255,255,0.55)"
-                />
-              )}
-
-              {/* Label below dot — all stops, three tiers of opacity */}
-              <text
-                x={x}
-                y={Y + 22}
-                textAnchor="middle"
-                fontSize={labelSize}
-                fontFamily={FONT}
-                fontWeight={labelWeight}
-                letterSpacing={labelSpacing}
-                fill={labelFill}
-                style={{ pointerEvents: 'none', userSelect: 'none', textTransform: 'uppercase' }}
+            <Fragment key={i}>
+              {/* Dot + label column */}
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: isMobile ? 5 : 7,
+                  cursor: 'pointer',
+                }}
+                onClick={() => onActClick(i)}
+                onMouseEnter={() => setHoveredStop(i)}
+                onMouseLeave={() => setHoveredStop(null)}
               >
-                {act.label}
-              </text>
-            </g>
+                <div style={{
+                  width: dotSize,
+                  height: dotSize,
+                  borderRadius: '50%',
+                  background: dotBg,
+                  border: dotBorder,
+                  boxShadow: dotShadow,
+                  transition: 'all 0.35s ease',
+                  animation: isActive ? 'dotPulse 2s ease-out infinite' : 'none',
+                }} />
+                <span style={{
+                  fontFamily: MONO,
+                  fontSize: isMobile ? '0.50rem' : '0.58rem',
+                  color: labelColor,
+                  fontWeight: isActive ? 700 : 400,
+                  letterSpacing: '0.06em',
+                  textAlign: 'center',
+                  transition: 'color 0.3s ease',
+                  userSelect: 'none',
+                  pointerEvents: 'none',
+                }}>
+                  {act.label}
+                </span>
+              </div>
+
+              {/* Connector line */}
+              {i < ACTS.length - 1 && (
+                <div style={{
+                  flex: 2,
+                  height: 1.5,
+                  marginTop: i === currentAct || i + 1 === currentAct ? (isMobile ? 6 : 8) : (isMobile ? 3.75 : 5),
+                  background: isVisited ? C.teal : 'rgba(255,255,255,0.13)',
+                  transition: 'background 0.4s ease, margin-top 0.35s ease',
+                  alignSelf: 'flex-start',
+                }} />
+              )}
+            </Fragment>
           );
         })}
-      </svg>
+      </div>
     </div>
   );
 }

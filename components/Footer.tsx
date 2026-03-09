@@ -4,7 +4,7 @@ import { C, FONT, MONO } from '@/lib/constants';
 const FOOTER_LINKS = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
-  { href: '/assessment', label: 'Free Assessment' },
+  { href: '/assessment', label: 'Assess My Fleet' },
   { href: '/contact', label: 'Contact' },
 ];
 
@@ -12,7 +12,7 @@ export function Footer() {
   return (
     <footer
       style={{
-        borderTop: `1px solid ${C.border}`,
+        borderTop: '1px solid rgba(255,255,255,0.08)',
         padding: '40px 24px',
         background: C.bgDark,
       }}

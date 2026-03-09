@@ -8,13 +8,13 @@ import { C, FONT } from '@/lib/constants';
 const NAV_ITEMS = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
-  { href: '/assessment', label: 'Free Assessment' },
+  { href: '/assessment', label: 'Assess My Fleet' },
   { href: '/contact', label: 'Contact' },
 ];
 
-// Hero section height — matches HeroScroll.tsx (450vh mobile, 500vh desktop)
+// Hero section height — matches HeroScroll.tsx (550vh mobile, 500vh desktop)
 const HERO_HEIGHT_VH_DESKTOP = 500;
-const HERO_HEIGHT_VH_MOBILE = 450;
+const HERO_HEIGHT_VH_MOBILE = 550;
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false);
@@ -49,10 +49,10 @@ export function Nav() {
   return (
     <nav
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
+        position: isMobile ? 'relative' : 'fixed',
+        top: isMobile ? undefined : 0,
+        left: isMobile ? undefined : 0,
+        right: isMobile ? undefined : 0,
         zIndex: 999,
         background: dark
           ? 'rgba(11,17,32,0.7)'
@@ -152,7 +152,7 @@ export function Nav() {
         <div
           style={{
             position: 'fixed',
-            top: 60,
+            top: 0,
             left: 0,
             right: 0,
             bottom: 0,
@@ -164,7 +164,7 @@ export function Nav() {
             overflowY: 'auto',
           }}
         >
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => item.href !== '/assessment').map((item) => {
             const active = pathname === item.href;
             return (
               <Link
@@ -203,7 +203,7 @@ export function Nav() {
               textDecoration: 'none',
             }}
           >
-            Free Assessment →
+            Assess My Fleet →
           </Link>
         </div>
       )}

@@ -90,25 +90,59 @@ function WelcomeScreen({ onStart }: { onStart: () => void }) {
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px' }}>
       <div style={{ maxWidth: 600, width: '100%', textAlign: 'center' }}>
         {/* Tag */}
-        <div style={tagStyle(C.accent, C.accentDim)}>Free Fleet Assessment</div>
+        <div style={tagStyle(C.accent, C.accentDim)}>Where to Start</div>
 
         <h1 style={{ fontFamily: FONT, fontSize: 'clamp(2rem, 5vw, 2.8rem)', fontWeight: 900, color: C.text, lineHeight: 1.15, margin: '20px 0 16px', letterSpacing: '-0.02em' }}>
-          Find Out Exactly How Much Your Fleet Is Losing to Manual Admin
+          Find Out Exactly How Many Hours and £s Your Fleet Is Losing to Manual Admin
         </h1>
-        <p style={{ color: C.textMid, fontSize: '1.08rem', lineHeight: 1.65, marginBottom: 32 }}>
-          2 minutes. Instant personalised report. No phone number required.
+        <p style={{ fontFamily: FONT, fontSize: '1.05rem', fontStyle: 'italic', color: C.textMid, margin: '-8px 0 16px', lineHeight: 1.5 }}>
+          and what automating it could mean for your fleet
+        </p>
+        <p style={{ fontFamily: FONT, fontSize: '0.88rem', color: C.textMid, marginBottom: 20, lineHeight: 1.5 }}>
+          Built by a former haulage operator, for haulage operators.
+        </p>
+        <p style={{ color: C.textMid, fontSize: '1.08rem', lineHeight: 1.65, marginBottom: 28 }}>
+          9 questions. Instant personalised report. No phone number required.
         </p>
 
         {/* Badges */}
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 36 }}>
-          {['Takes 2 minutes', '100% free', 'Personalised report'].map((b) => (
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 32 }}>
+          {['9 questions', '100% free', 'Instant results'].map((b) => (
             <span key={b} style={{ background: C.bgWhite, border: `1px solid ${C.border}`, borderRadius: 20, padding: '6px 16px', fontSize: '0.82rem', fontWeight: 700, color: C.textMid }}>{b}</span>
           ))}
         </div>
 
         <Btn primary onClick={onStart} style={{ fontSize: '1.05rem', padding: '16px 48px' }}>
-          Start My Assessment →
+          Show Me What I&apos;m Missing →
         </Btn>
+
+        {/* Doubt removers */}
+        <p style={{ fontFamily: FONT, fontSize: '0.82rem', color: C.textMid, marginTop: 14, opacity: 0.75 }}>
+          Free · No phone number · Results in under 2 minutes
+        </p>
+
+        {/* Report preview */}
+        <div style={{ marginTop: 48, background: C.bgWhite, border: `1px solid ${C.border}`, borderRadius: 12, padding: '24px 28px', textAlign: 'left' }}>
+          <p style={{ fontFamily: FONT, fontSize: '0.92rem', fontWeight: 700, color: C.text, marginBottom: 16 }}>
+            What you&apos;ll walk away knowing:
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[
+              'Where your biggest automation opportunities are hiding',
+              'How many hours your team is losing to manual admin every week',
+              'What that time is actually costing you in £s per year',
+              'Your top 3 specific fixes, ranked by impact',
+            ].map((item) => (
+              <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <span style={{ color: C.accent, fontWeight: 700, fontSize: '1rem', lineHeight: '1.5', flexShrink: 0 }}>→</span>
+                <span style={{ fontFamily: FONT, fontSize: '0.92rem', color: C.text, lineHeight: 1.5 }}>{item}</span>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontFamily: FONT, fontSize: '0.82rem', color: C.textMid, marginTop: 20, fontStyle: 'italic' }}>
+            Calculated from your answers. Specific to your fleet size and setup.
+          </p>
+        </div>
 
       </div>
     </div>
@@ -309,7 +343,7 @@ function ContactScreen({
     <div style={{ minHeight: 'calc(100vh - 60px)', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 24px' }}>
       <div style={{ maxWidth: 480, width: '100%', textAlign: 'center' }}>
         {/* Score preview */}
-        <ScoreGauge score={previewScore} size={120} color={scoreColor} blurred />
+        <ScoreGauge score={previewScore} color={scoreColor} blurred />
         <div style={{ marginTop: 12, marginBottom: 4 }}>
           <span style={{ fontFamily: FONT, fontSize: '1.5rem', fontWeight: 900, color: scoreColor }}>{previewScore}</span>
           <span style={{ color: C.textLight, fontSize: '1rem' }}>/100</span>
@@ -378,7 +412,7 @@ function ResultsReport({ results, firstName }: { results: Results; firstName: st
   return (
     <div style={{ background: C.bg, minHeight: '100vh', position: 'relative' }}>
       {/* Road background — behind cards (zIndex 0), content at zIndex 1 */}
-      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0, opacity: 0.13 }}>
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0, opacity: 0.04 }}>
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" viewBox="0 0 800 2400">
           {/* Left road edge — starts top-left, snakes R→L→R→L→R */}
           <path d="M 60 0 C 60 240 660 240 660 480 C 660 720 60 720 60 960 C 60 1200 660 1200 660 1440 C 660 1680 60 1680 60 1920 C 60 2160 660 2160 660 2400" fill="none" stroke="#E8612D" strokeWidth="4" />
@@ -418,9 +452,9 @@ function ResultsReport({ results, firstName }: { results: Results; firstName: st
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '28px 24px 80px', position: 'relative', zIndex: 1 }}>
 
         {firstName && (
-          <p style={{ color: C.textMid, fontSize: '1.05rem', marginBottom: 24 }}>
-            Hi {firstName}, here&apos;s your personalised fleet assessment.
-          </p>
+          <h2 style={{ fontFamily: FONT, fontSize: 'clamp(1.4rem, 3.5vw, 1.9rem)', fontWeight: 900, color: C.text, lineHeight: 1.2, marginBottom: 24, letterSpacing: '-0.01em' }}>
+            {firstName}, here&apos;s your Fleet Automation Report.
+          </h2>
         )}
 
         {/* ── Score + Savings hero ── */}
@@ -431,12 +465,8 @@ function ResultsReport({ results, firstName }: { results: Results; firstName: st
               <div style={{ fontSize: '0.75rem', color: C.textDim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
                 Automation Readiness Score
               </div>
-              <ScoreGauge score={readinessScore} size={200} color={scoreColor} />
-              <div style={{ marginTop: 12 }}>
-                <span style={{ fontFamily: FONT, fontSize: '3.5rem', fontWeight: 900, color: scoreColor }}>{readinessScore}</span>
-                <span style={{ color: C.textLight, fontSize: '1.2rem' }}>/100</span>
-              </div>
-              <div style={{ fontFamily: FONT, fontSize: '0.9rem', fontWeight: 700, color: scoreColor, marginTop: 4 }}>
+              <ScoreGauge score={readinessScore} color={scoreColor} />
+              <div style={{ fontFamily: FONT, fontSize: '0.9rem', fontWeight: 700, color: scoreColor, marginTop: 8 }}>
                 {getScoreLabel(readinessScore)}
               </div>
             </div>
@@ -489,6 +519,9 @@ function ResultsReport({ results, firstName }: { results: Results; firstName: st
                       £{agent.monthlySaving.toLocaleString()}/mo
                     </span>
                   </div>
+                  <p style={{ fontFamily: FONT, fontSize: '0.72rem', color: C.textLight, margin: 0, fontStyle: 'italic' }}>
+                    Based on industry averages for a {vehicleCount}-vehicle fleet
+                  </p>
                 </div>
               );
             })}
@@ -615,27 +648,17 @@ function ResultsReport({ results, firstName }: { results: Results; firstName: st
   );
 }
 
-// ─── Score gauge (SVG animated) ───────────────────────────────────────────────
-function ScoreGauge({ score, size = 160, color, blurred = false }: { score: number; size?: number; color: string; blurred?: boolean }) {
-  const radius = (size - 16) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference - (score / 100) * circumference;
-
+// ─── Score gauge ──────────────────────────────────────────────────────────────
+function ScoreGauge({ score, color, blurred = false }: { score: number; color: string; blurred?: boolean }) {
   return (
-    <div style={{ display: 'inline-block', position: 'relative', filter: blurred ? 'blur(4px) opacity(0.6)' : 'none' }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={C.borderLight} strokeWidth={8} />
-        <circle
-          cx={size / 2} cy={size / 2} r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth={8}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
-          style={{ transition: 'stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1)', transformOrigin: 'center' }}
-        />
-      </svg>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, filter: blurred ? 'blur(5px)' : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+        <span style={{ fontFamily: FONT, fontSize: '4.5rem', fontWeight: 900, color, lineHeight: 1 }}>{score}</span>
+        <span style={{ fontFamily: FONT, fontSize: '1.4rem', color: C.textLight, fontWeight: 700 }}>/100</span>
+      </div>
+      <div style={{ width: '100%', maxWidth: 180, height: 8, background: C.borderLight, borderRadius: 99 }}>
+        <div style={{ height: '100%', width: `${score}%`, background: color, borderRadius: 99, transition: 'width 0.6s ease' }} />
+      </div>
     </div>
   );
 }

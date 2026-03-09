@@ -82,6 +82,7 @@ interface AgentDef {
   metricLabel: string;
   metricValue: string;
   show: [number, number];
+  notecards: [string, string];
 }
 
 const AGENTS: AgentDef[] = [
@@ -95,6 +96,7 @@ const AGENTS: AgentDef[] = [
     metricLabel: 'Orders processed today',
     metricValue: '47',
     show: [0, 0.15],
+    notecards: ['An order email lands', 'AI pulls out every detail — no typing needed'],
   },
   {
     id: 'agent-1',
@@ -106,6 +108,7 @@ const AGENTS: AgentDef[] = [
     metricLabel: 'Match accuracy',
     metricValue: '100%',
     show: [0.17, 0.32],
+    notecards: ['Delivery note arrives', 'Matched and filed automatically'],
   },
   {
     id: 'agent-2',
@@ -117,6 +120,7 @@ const AGENTS: AgentDef[] = [
     metricLabel: 'Violations this quarter',
     metricValue: 'Zero',
     show: [0.34, 0.49],
+    notecards: ['Hours tracked as drivers go', 'Flagged before you hit the limit'],
   },
   {
     id: 'agent-3',
@@ -128,6 +132,7 @@ const AGENTS: AgentDef[] = [
     metricLabel: 'Invoiced today',
     metricValue: '£12,450',
     show: [0.51, 0.66],
+    notecards: ['Job marked complete', 'Invoice raised and sent — same second'],
   },
   {
     id: 'agent-4',
@@ -139,6 +144,7 @@ const AGENTS: AgentDef[] = [
     metricLabel: 'Routes planned today',
     metricValue: '23',
     show: [0.68, 0.83],
+    notecards: ['Tomorrow\'s jobs land in your inbox', 'Optimised route, ready to run'],
   },
   {
     id: 'agent-5',
@@ -150,6 +156,7 @@ const AGENTS: AgentDef[] = [
     metricLabel: 'Avg. response time',
     metricValue: '3.2s',
     show: [0.85, 1.0],
+    notecards: ['Customer asks where their load is', 'Reply sent before you\'ve seen it'],
   },
 ];
 
@@ -168,9 +175,11 @@ const KEYFRAMES = `
   @keyframes agRow3   { 0%,35%{opacity:0;transform:translateY(6px)} 40%,100%{opacity:1;transform:translateY(0)} }
   @keyframes agRow4   { 0%,45%{opacity:0;transform:translateY(6px)} 50%,100%{opacity:1;transform:translateY(0)} }
   @keyframes agRow5   { 0%,55%{opacity:0;transform:translateY(6px)} 60%,100%{opacity:1;transform:translateY(0)} }
-  @keyframes agMatch  { 0%,50%{opacity:0;transform:scale(0.9)} 65%,100%{opacity:1;transform:scale(1)} }
-  @keyframes agLine   { 0%{stroke-dashoffset:120} 60%,100%{stroke-dashoffset:0} }
-  @keyframes agReply  { 0%,55%{opacity:0;transform:translateY(8px)} 70%,100%{opacity:1;transform:translateY(0)} }
+  @keyframes agMatch      { 0%,50%{opacity:0;transform:scale(0.9)} 65%,100%{opacity:1;transform:scale(1)} }
+  @keyframes agLine       { 0%{stroke-dashoffset:120} 60%,100%{stroke-dashoffset:0} }
+  @keyframes agReply      { 0%,55%{opacity:0;transform:translateY(8px)} 70%,100%{opacity:1;transform:translateY(0)} }
+  @keyframes agArrowDraw  { from{stroke-dashoffset:1} to{stroke-dashoffset:0} }
+  @keyframes agArrowHead  { from{opacity:0} to{opacity:1} }
 `;
 
 // ── Shared card shell ─────────────────────────────────────────────────────────
@@ -555,43 +564,192 @@ function CustomerCommsMock({ isMobile }: { isMobile?: boolean }) {
 
 const MOCK_UIS: Array<React.FC<{ isMobile?: boolean }>> = [OrderEntryMock, PODMatchingMock, ComplianceMock, InvoicingMock, RoutePlanningMock, CustomerCommsMock];
 
+// ── Agent notecard annotations ────────────────────────────────────────────────
+function AgentNotecard({
+  text,
+  accentColor,
+  position,
+  visible,
+}: {
+  text: string;
+  accentColor: string;
+  position: 'top' | 'bottom';
+  visible: boolean;
+}) {
+  const isTop = position === 'top';
+
+  // S-curve: CP2 shares the same x as the endpoint so the curve arrives vertically,
+  // meaning the arrowhead chevron (pointing straight up/down) stays perfectly aligned.
+  const shaftPath = isTop
+    ? 'M 22,0 C 36,14 22,28 22,43'
+    : 'M 22,46 C 8,32 22,18 22,3';
+
+  // Chevron arrowhead — tip exactly at shaft endpoint
+  const headPath = isTop
+    ? 'M 16,38 L 22,43 L 28,38'
+    : 'M 16,8 L 22,3 L 28,8';
+
+  const shaftDelay = isTop ? 0.3 : 0.5;
+  const headDelay  = isTop ? 0.78 : 0.98;
+
+  const arrowSvg = (
+    <svg
+      key={visible ? 'vis' : 'hid'}
+      width={44}
+      height={46}
+      viewBox="0 0 44 46"
+      style={{ display: 'block', overflow: 'visible' }}
+    >
+      <path
+        d={shaftPath}
+        stroke={accentColor}
+        strokeWidth={1.8}
+        fill="none"
+        strokeOpacity={0.62}
+        strokeLinecap="round"
+        pathLength={1}
+        strokeDasharray="1"
+        style={{
+          animation: visible
+            ? `agArrowDraw 0.55s ease-out ${shaftDelay}s both`
+            : 'none',
+          strokeDashoffset: visible ? undefined : (1 as unknown as string),
+        } as React.CSSProperties}
+      />
+      <path
+        d={headPath}
+        stroke={accentColor}
+        strokeWidth={1.8}
+        fill="none"
+        strokeOpacity={0.62}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{
+          animation: visible
+            ? `agArrowHead 0.2s ease-out ${headDelay}s both`
+            : 'none',
+          opacity: visible ? undefined : 0,
+        } as React.CSSProperties}
+      />
+    </svg>
+  );
+
+  const notecard = (
+    <div
+      style={{
+        width: 152,
+        background: '#FEFCFA',
+        border: '1px solid rgba(0,0,0,0.07)',
+        borderLeft: `3px solid ${accentColor}`,
+        borderRadius: 8,
+        padding: '9px 12px',
+        boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+        fontFamily: FONT,
+        fontSize: '0.75rem',
+        fontWeight: 700,
+        color: C.text,
+        lineHeight: 1.4,
+      }}
+    >
+      {text}
+    </div>
+  );
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        maxWidth: 480,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: isTop ? 'flex-end' : 'flex-start',
+        paddingRight: isTop ? '20%' : 0,
+        paddingLeft: isTop ? 0 : '20%',
+      }}
+    >
+      {isTop ? (
+        <>
+          {notecard}
+          <div style={{ marginTop: 2 }}>{arrowSvg}</div>
+        </>
+      ) : (
+        <>
+          <div style={{ marginBottom: 2 }}>{arrowSvg}</div>
+          {notecard}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Agent progress indicator ──────────────────────────────────────────────────
-function AgentProgress({ active, isMobile }: { active: number; isMobile: boolean }) {
+function AgentProgress({ active, isMobile, containerRef }: {
+  active: number;
+  isMobile: boolean;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+}) {
   const labels = ['Orders', 'PODs', 'Compliance', 'Invoicing', 'Routes', 'Comms'];
+  const [hoveredDot, setHoveredDot] = React.useState<number | null>(null);
+
+  const handleDotClick = (i: number) => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    const target = el.offsetTop + AGENTS[i].show[0] * el.offsetHeight;
+    window.scrollTo({ top: target, behavior: 'smooth' });
+  };
+
   return (
     <div style={{
       position: 'absolute',
-      bottom: isMobile ? 16 : 28,
+      bottom: isMobile ? 16 : 32,
       left: 0,
       right: 0,
       zIndex: 5,
       display: 'flex',
       justifyContent: 'center',
-      pointerEvents: 'none',
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', width: 'min(480px, 90vw)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', width: 'min(560px, 90vw)' }}>
         {labels.map((label, i) => (
           <React.Fragment key={label}>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <div style={{
-                width: i === active ? 14 : 10,
-                height: i === active ? 14 : 10,
-                borderRadius: '50%',
-                background: i < active ? C.teal : i === active ? C.accent : 'transparent',
-                border: i > active ? '1.5px solid rgba(0,0,0,0.18)' : 'none',
-                boxShadow: i === active ? `0 0 0 4px ${C.accent}28` : 'none',
-                transition: 'all 0.4s ease',
-              }} />
+              <div
+                onClick={() => handleDotClick(i)}
+                onMouseEnter={() => setHoveredDot(i)}
+                onMouseLeave={() => setHoveredDot(null)}
+                style={{
+                  width: i === active ? 17 : 12,
+                  height: i === active ? 17 : 12,
+                  borderRadius: '50%',
+                  background: i < active ? C.teal : i === active ? C.accent : 'transparent',
+                  border: i > active ? '1.5px solid rgba(0,0,0,0.18)' : 'none',
+                  boxShadow: i === active
+                    ? `0 0 0 5px ${C.accent}28`
+                    : hoveredDot === i
+                      ? '0 0 0 4px rgba(0,0,0,0.12)'
+                      : 'none',
+                  transform: hoveredDot === i ? 'scale(1.35)' : 'scale(1)',
+                  transition: 'all 0.25s ease',
+                  cursor: 'pointer',
+                  pointerEvents: 'auto',
+                }}
+              />
               {!isMobile && (
-                <span style={{
-                  fontFamily: MONO,
-                  fontSize: '0.56rem',
-                  color: i === active ? C.text : C.textDim,
-                  fontWeight: i === active ? 700 : 400,
-                  transition: 'color 0.3s ease',
-                  textAlign: 'center',
-                  letterSpacing: '0.06em',
-                }}>
+                <span
+                  onClick={() => handleDotClick(i)}
+                  onMouseEnter={() => setHoveredDot(i)}
+                  onMouseLeave={() => setHoveredDot(null)}
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: '0.63rem',
+                    color: hoveredDot === i || i === active ? C.text : C.textDim,
+                    fontWeight: i === active || hoveredDot === i ? 700 : 400,
+                    transition: 'color 0.25s ease, font-weight 0.25s ease',
+                    textAlign: 'center',
+                    letterSpacing: '0.06em',
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                  }}
+                >
                   {label}
                 </span>
               )}
@@ -600,10 +758,11 @@ function AgentProgress({ active, isMobile }: { active: number; isMobile: boolean
               <div style={{
                 flex: 2,
                 height: 1.5,
-                marginTop: i === active || i + 1 === active ? 6 : 4.25,
+                marginTop: i === active || i + 1 === active ? 7.5 : 5,
                 background: i < active ? C.teal : 'rgba(0,0,0,0.12)',
                 transition: 'background 0.4s ease',
                 alignSelf: 'flex-start',
+                pointerEvents: 'none',
               }} />
             )}
           </React.Fragment>
@@ -730,8 +889,35 @@ export function AgentShowcaseScroll() {
           pointerEvents: 'none',
         }} />
 
-        {/* Agent progress indicator */}
-        <AgentProgress active={activeAgent} isMobile={isMobile} />
+        {/* Persistent section heading — always visible throughout scroll */}
+        <div style={{
+          position: 'absolute',
+          top: isMobile ? 16 : 76,
+          left: 0,
+          right: 0,
+          zIndex: 3,
+          textAlign: 'center',
+          pointerEvents: 'none',
+          padding: '0 24px',
+          opacity: activeAgent === 0 ? 1 : 0,
+          transition: 'opacity 0.5s ease',
+        }}>
+          <p style={{
+            fontFamily: FONT,
+            fontSize: 'clamp(0.85rem, 1.8vw, 1.05rem)',
+            fontWeight: 700,
+            color: C.textMid,
+            letterSpacing: '-0.01em',
+            margin: 0,
+          }}>
+            These are the admin tasks we automate for you.
+          </p>
+        </div>
+
+        {/* Agent progress indicator — desktop only */}
+        {!isMobile && (
+          <AgentProgress active={activeAgent} isMobile={isMobile} containerRef={containerRef} />
+        )}
 
         {/* Panels */}
         {AGENTS.map((agent, i) => {
@@ -747,9 +933,9 @@ export function AgentShowcaseScroll() {
                 display: 'flex',
                 alignItems: isMobile ? 'flex-start' : 'center',
                 justifyContent: 'center',
-                padding: isMobile ? '90px 14px 16px' : '72px 24px 0',
+                padding: isMobile ? '44px 14px 16px' : '72px 24px 0',
                 willChange: 'opacity, transform',
-                overflowY: 'hidden',
+                overflow: isMobile ? 'visible' : 'hidden',
               }}
             >
               {/* Per-agent drifting word field */}
@@ -759,7 +945,7 @@ export function AgentShowcaseScroll() {
                 style={{
                   display: 'grid',
                   gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-                  gap: isMobile ? 20 : 56,
+                  gap: isMobile ? 12 : 56,
                   maxWidth: isMobile ? '100%' : 1080,
                   width: '100%',
                   alignItems: 'center',
@@ -780,7 +966,7 @@ export function AgentShowcaseScroll() {
                     padding: isMobile ? '5px 12px' : '8px 20px',
                     borderRadius: 6,
                     fontWeight: 700,
-                    marginBottom: isMobile ? 10 : 20,
+                    marginBottom: isMobile ? 6 : 20,
                   }}>
                     {agent.badge}
                   </div>
@@ -789,11 +975,11 @@ export function AgentShowcaseScroll() {
                   <h2
                     style={{
                       fontFamily: FONT,
-                      fontSize: isMobile ? '1.45rem' : 'clamp(1.6rem, 3.2vw, 2.6rem)',
+                      fontSize: isMobile ? '1.2rem' : 'clamp(1.6rem, 3.2vw, 2.6rem)',
                       fontWeight: 900,
                       color: C.text,
                       lineHeight: 1.12,
-                      margin: isMobile ? '0 0 8px' : '0 0 14px',
+                      margin: isMobile ? '0 0 4px' : '0 0 14px',
                       letterSpacing: '-0.025em',
                     }}
                   >
@@ -808,35 +994,102 @@ export function AgentShowcaseScroll() {
                       fontSize: isMobile ? '0.88rem' : '1rem',
                       color: C.textMid,
                       lineHeight: 1.55,
-                      margin: isMobile ? '0 0 12px' : '0 0 28px',
+                      margin: isMobile ? '0 0 6px' : '0 0 28px',
                       maxWidth: 400,
                     }}
                   >
                     {agent.sub}
                   </p>
 
-                  {/* Metric */}
-                  <div style={{
-                    display: 'inline-flex',
-                    flexDirection: 'column',
-                    gap: 4,
-                    background: 'rgba(0,0,0,0.04)',
-                    border: `1px solid ${agent.badgeColor}28`,
-                    borderRadius: 10,
-                    padding: isMobile ? '10px 16px' : '14px 22px',
-                  }}>
-                    <span style={{ fontFamily: MONO, fontSize: '0.58rem', color: C.textDim, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                      {agent.metricLabel}
-                    </span>
-                    <span style={{ fontFamily: FONT, fontSize: isMobile ? '1.5rem' : '2rem', fontWeight: 900, color: agent.badgeColor, letterSpacing: '-0.02em', lineHeight: 1 }}>
-                      {agent.metricValue}
-                    </span>
-                  </div>
+                  {/* Metric — desktop only */}
+                  {!isMobile && (
+                    <div style={{
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                      background: 'rgba(0,0,0,0.04)',
+                      border: `1px solid ${agent.badgeColor}28`,
+                      borderRadius: 10,
+                      padding: '14px 22px',
+                    }}>
+                      <span style={{ fontFamily: MONO, fontSize: '0.58rem', color: C.textDim, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                        {agent.metricLabel}
+                      </span>
+                      <span style={{ fontFamily: FONT, fontSize: '2rem', fontWeight: 900, color: agent.badgeColor, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                        {agent.metricValue}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Right: mock UI */}
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <MockUI isMobile={isMobile} />
+                {/* Right: mock UI — annotated above and below */}
+                <div style={{ display: 'flex', justifyContent: 'center', height: isMobile ? (i === 1 ? 330 : i === 2 ? 295 : i === 3 ? 285 : i === 4 ? 325 : i === 5 ? 300 : 320) : 'auto', overflow: 'visible' }}>
+                  <div style={{
+                    width: '100%',
+                    transform: isMobile ? `scale(${i === 1 ? 0.72 : i === 2 ? 0.78 : i === 4 ? 0.72 : i === 5 ? 0.74 : 0.82})` : 'none',
+                    transformOrigin: 'top center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                  }}>
+                    {isMobile ? (
+                      <>
+                        <span style={{
+                          alignSelf: 'flex-end',
+                          marginBottom: 4,
+                          marginRight: '10%',
+                          display: 'inline-block',
+                          fontFamily: FONT,
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: C.text,
+                          background: '#FEFCFA',
+                          border: '1px solid rgba(0,0,0,0.10)',
+                          borderLeft: `3px solid ${agent.badgeColor}`,
+                          borderRadius: 6,
+                          padding: '6px 10px',
+                          lineHeight: 1.3,
+                          maxWidth: 180,
+                        }}>{agent.notecards[0]}</span>
+                      </>
+                    ) : (
+                      <AgentNotecard
+                        text={agent.notecards[0]}
+                        accentColor={agent.badgeColor}
+                        position="top"
+                        visible={activeAgent === i}
+                      />
+                    )}
+                    <MockUI isMobile={isMobile} />
+                    {isMobile ? (
+                      <>
+                        <span style={{
+                          alignSelf: 'flex-start',
+                          marginTop: 4,
+                          marginLeft: '10%',
+                          display: 'inline-block',
+                          fontFamily: FONT,
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          color: C.text,
+                          background: '#FEFCFA',
+                          border: '1px solid rgba(0,0,0,0.10)',
+                          borderLeft: `3px solid ${agent.badgeColor}`,
+                          borderRadius: 6,
+                          padding: '6px 10px',
+                          lineHeight: 1.3,
+                          maxWidth: 180,
+                        }}>{agent.notecards[1]}</span>
+                      </>
+                    ) : (
+                      <AgentNotecard
+                        text={agent.notecards[1]}
+                        accentColor={agent.badgeColor}
+                        position="bottom"
+                        visible={activeAgent === i}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

@@ -121,7 +121,7 @@ function FAQItem({ q, a, open, onToggle, isLast }: FAQItemProps) {
 }
 
 export function FAQSection() {
-  const [openIndex, setOpenIndex] = useState<number>(0);
+  const [openIndex, setOpenIndex] = useState<number>(-1);
 
   return (
     <div style={{ background: C.bgWhite }}>

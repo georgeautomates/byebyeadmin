@@ -294,7 +294,7 @@ export function calculateResults(answers: string[]): Results {
       buildAgent(
         'Order Entry Agent',
         'Processes customer emails, extracts order details, and handles vague requests and missing information automatically.',
-        2.5,
+        0.45,
         vehicleCount,
         'HIGH IMPACT'
       )
@@ -311,7 +311,7 @@ export function calculateResults(answers: string[]): Results {
       buildAgent(
         'Invoice & POD Matching Agent',
         'Matches delivery photos to jobs, creates invoices, and catches discrepancies before sending.',
-        1.8,
+        0.30,
         vehicleCount,
         'HIGH IMPACT'
       )
@@ -327,7 +327,7 @@ export function calculateResults(answers: string[]): Results {
       buildAgent(
         'Compliance & Tachograph Agent',
         'Checks driver hours across your fleet, flags violations, generates weekly reports, and predicts breaches before they happen.',
-        1.2,
+        0.22,
         vehicleCount,
         'HIGH IMPACT'
       )
@@ -344,7 +344,7 @@ export function calculateResults(answers: string[]): Results {
       buildAgent(
         'Quote Generator Agent',
         'Prices jobs instantly including multi-leg work, and responds to out-of-hours requests automatically.',
-        1.0,
+        0.18,
         vehicleCount,
         'MEDIUM IMPACT'
       )
@@ -361,7 +361,7 @@ export function calculateResults(answers: string[]): Results {
       buildAgent(
         'Customer Communication Agent',
         "Responds to delivery queries, sends bulk status updates, and handles 'where's my delivery' emails automatically.",
-        0.8,
+        0.14,
         vehicleCount,
         'QUICK WIN'
       )
@@ -372,7 +372,7 @@ export function calculateResults(answers: string[]): Results {
   const routeAgent = buildAgent(
     'Route Optimisation Agent',
     'Plans multi-stop routes, re-optimises after breakdowns, and maximises vehicle utilisation.',
-    1.5,
+    0.28,
     vehicleCount,
     'MEDIUM IMPACT'
   );
@@ -417,9 +417,10 @@ export function getScoreColor(score: number): string {
 }
 
 export function getScoreLabel(score: number): string {
-  if (score >= 66) return "You're already well-automated";
+  if (score >= 81) return "You're ahead of most UK operators";
+  if (score >= 61) return 'Good foundations — real savings still within reach';
   if (score >= 33) return 'Moderate automation — clear room to grow';
-  return 'Significant opportunity — most operations at this stage';
+  return 'Significant opportunity — most operations are here too';
 }
 
 export function getCategoryStatus(score: number): 'green' | 'amber' | 'red' {

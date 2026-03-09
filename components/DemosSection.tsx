@@ -33,7 +33,15 @@ export function DemosSection() {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [arrowHover, setArrowHover] = useState<'left' | 'right' | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     fetch('/api/demos')
@@ -114,6 +122,9 @@ export function DemosSection() {
   return (
     <div style={{ background: C.bgDark, position: 'relative', overflow: 'hidden' }}>
 
+      {/* Section divider from AgentShowcase */}
+      <div style={{ height: 1, background: 'rgba(232,97,45,0.25)', position: 'relative', zIndex: 1 }} />
+
       {/* Grid background */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
@@ -164,7 +175,7 @@ export function DemosSection() {
           <Fade>
             <Tag>Demos</Tag>
             <div style={{ marginTop: 16 }}>
-              <H2 dark>Watch the agents in action</H2>
+              <H2 dark>Watch the automations in action</H2>
             </div>
           </Fade>
           <Fade delay={0.05}>
@@ -274,8 +285,8 @@ export function DemosSection() {
                         {/* Title overlay */}
                         <div style={{
                           position: 'absolute', bottom: 0, left: 0, right: 0,
-                          background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.45) 55%, transparent 100%)',
-                          padding: '44px 12px 14px',
+                          background: isMobile ? 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.15) 75%, transparent 100%)' : 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.45) 55%, transparent 100%)',
+                          padding: isMobile ? '56px 12px 14px' : '44px 12px 14px',
                           pointerEvents: 'none',
                         }}>
                           <div style={{
@@ -289,6 +300,7 @@ export function DemosSection() {
                             fontFamily: FONT, fontWeight: 700,
                             fontSize: '0.9rem', color: '#fff',
                             lineHeight: 1.35,
+                            textShadow: isMobile ? '0 1px 6px rgba(0,0,0,0.7)' : 'none',
                           }}>
                             {demo.title}
                           </div>
