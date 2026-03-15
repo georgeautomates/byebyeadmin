@@ -2,7 +2,15 @@
 
 ## What the project is
 
-B2B marketing site for a UK haulage AI automation service (byebyeadmin.co.uk). Target audience: UK fleet operators running 3–100 vehicles. The site is built with Next.js (App Router), Three.js for the 3D hero, GSAP ScrollTrigger for scroll-driven animations, and Lenis for smooth scrolling.
+B2B marketing site + AI ops infrastructure for ByeByeAdmin (byebyeadmin.co.uk).
+
+**Two parts in this repo:**
+- Root — Next.js marketing site (App Router, Three.js, GSAP, Lenis)
+- `ops/` — BBA ops infrastructure: skills, agents, project contexts, memory. See `ops/CLAUDE.md`.
+
+---
+
+The site is a Target audience: UK fleet operators running 3–100 vehicles. The site is built with Next.js (App Router), Three.js for the 3D hero, GSAP ScrollTrigger for scroll-driven animations, and Lenis for smooth scrolling.
 
 ## Deployment
 
