@@ -63,8 +63,9 @@ agents/memory.md
 | Vercel CLI | Deployments | Live — `VERCEL_TOKEN` in env |
 | gh CLI | GitHub | Live — authenticated as `georgeautomates` |
 | n8n | Workflow automation | Live — MCP wired in Claude Code |
-| Perplexity | Web research | Not yet — needs `PERPLEXITY_API_KEY` |
-| Firecrawl | Web scraping | Not yet — needs `FIRECRAWL_API_KEY` |
+| GA4 | Website analytics | Live — `GA4_PROPERTY_ID=527598212`, OAuth via `GMAIL_*` vars |
+| Perplexity | Web research | Live — `PERPLEXITY_API_KEY` in env |
+| Tavily | Web search | Live — `TAVILY_API_KEY` in env |
 
 ## Conventions
 

@@ -41,3 +41,7 @@ ops/.env.*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# browser automation
+scripts/browser/.sessions/
+scripts/browser/node_modules/
