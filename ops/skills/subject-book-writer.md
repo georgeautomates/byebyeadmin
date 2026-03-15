@@ -1,4 +1,18 @@
+---
+name: subject-book-writer
+category: brand-content
+depends-on: [brand-context/voice.md, brand-context/positioning.md, brand-context/icp.md]
+outputs: [article, newsletter, lead-magnet, guide]
+triggers: [article, newsletter, long-form, lead magnet, guide, ebook]
+overlaps: [script-writing (video equivalent of long-form), caption-writing (short-form of same content)]
+pre-flight: Check ops/learnings.md → subject-book-writer section before starting.
+---
+
 # Skill: Subject / Book Writer
+
+## Pre-Flight
+
+Before writing: read `ops/brand-context/voice.md` (tone, hard no's), `ops/brand-context/positioning.md` (key differentiators and proof points to weave in), and `ops/brand-context/icp.md` (audience pain points and language). Check `ops/learnings.md` → subject-book-writer section for any logged corrections.
 
 ## Purpose
 

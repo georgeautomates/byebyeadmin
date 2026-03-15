@@ -1,3 +1,13 @@
+---
+name: memory-agent
+category: meta
+depends-on: []
+outputs: [memory-entry, updated-context]
+triggers: [remember, save this, memory, context, end of session, remember this]
+overlaps: [wrap-up (wrap-up triggers memory capture at session end)]
+pre-flight: Check ops/learnings.md → memory-agent section before starting.
+---
+
 # Skill: Memory Agent
 
 ## Purpose

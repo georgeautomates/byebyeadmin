@@ -1,3 +1,13 @@
+---
+name: transcription
+category: ops
+depends-on: []
+outputs: [client-context-card, shorts-timestamps, structured-outline]
+triggers: [transcript, transcription, call notes, recording, voice note, audio]
+overlaps: [summarising-agent (both process source material), script-writing (transcript → script)]
+pre-flight: Check ops/learnings.md → transcription section before starting.
+---
+
 # Skill: Transcription Agent
 
 ## Purpose

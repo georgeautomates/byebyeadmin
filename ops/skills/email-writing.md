@@ -1,4 +1,18 @@
+---
+name: email-writing
+category: sales
+depends-on: [brand-context/voice.md, brand-context/icp.md]
+outputs: [cold-email-copy, follow-up-sequences, reply-templates]
+triggers: [cold email, outreach, follow-up, email copy, subject line, sequence]
+overlaps: [caption-writing (short persuasive copy)]
+pre-flight: Check ops/learnings.md → email-writing section before starting.
+---
+
 # Skill: Email Writing
+
+## Pre-Flight
+
+Before writing: read `ops/brand-context/voice.md` (tone rules, hard no's) and `ops/brand-context/icp.md` (who you're writing to and their language). Check `ops/learnings.md` → email-writing section for any logged corrections.
 
 ## Purpose
 

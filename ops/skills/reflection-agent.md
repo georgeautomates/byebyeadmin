@@ -1,3 +1,13 @@
+---
+name: reflection-agent
+category: strategy
+depends-on: []
+outputs: [decision-review, post-mortem, weekly-review]
+triggers: [decision, review, post-mortem, weekly review, stuck, thinking, strategy]
+overlaps: [summarising-agent (both analyse information, different purposes)]
+pre-flight: Check ops/learnings.md → reflection-agent section before starting.
+---
+
 # Skill: Reflection Agent
 
 ## Purpose

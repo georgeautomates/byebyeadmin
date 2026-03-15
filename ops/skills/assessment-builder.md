@@ -1,3 +1,13 @@
+---
+name: assessment-builder
+category: product
+depends-on: [brand-context/icp.md, brand-context/positioning.md]
+outputs: [assessment-flow, scoring-logic, results-page]
+triggers: [assessment, quiz, scoring, funnel, readiness check]
+overlaps: [frontend-design (builds the UI for assessments)]
+pre-flight: Check ops/learnings.md → assessment-builder section before starting.
+---
+
 # Skill: Assessment Builder
 
 ## Purpose

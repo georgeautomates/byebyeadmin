@@ -1,4 +1,18 @@
+---
+name: script-writing
+category: brand-content
+depends-on: [brand-context/voice.md, brand-context/positioning.md]
+outputs: [youtube-script, shorts-script, reel-script]
+triggers: [script, YouTube, Shorts, Reels, voiceover, video, content]
+overlaps: [caption-writing (same channels), subject-book-writer (long-form content)]
+pre-flight: Check ops/learnings.md → script-writing section before starting.
+---
+
 # Skill: Script Writing
+
+## Pre-Flight
+
+Before writing: read `ops/brand-context/voice.md` (George's voice, spoken delivery rules) and `ops/brand-context/positioning.md` (what we're known for, differentiators to reference). Check `ops/learnings.md` → script-writing section for any logged corrections.
 
 ## Purpose
 

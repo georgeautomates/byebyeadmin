@@ -1,3 +1,13 @@
+---
+name: frontend-design
+category: product
+depends-on: []
+outputs: [react-component, next-js-page, ui-layout]
+triggers: [component, UI, frontend, React, Next.js, page, design, layout]
+overlaps: [assessment-builder (builds UI for assessments)]
+pre-flight: Check ops/learnings.md → frontend-design section before starting.
+---
+
 # Skill: Frontend Design
 
 ## Purpose

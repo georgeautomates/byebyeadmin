@@ -1,3 +1,13 @@
+---
+name: summarising-agent
+category: ops
+depends-on: []
+outputs: [exec-brief, data-summary, meeting-notes]
+triggers: [summarise, summary, brief, distil, TL;DR, key points, notes]
+overlaps: [reflection-agent (both process information, different purposes), transcription (both process source material)]
+pre-flight: Check ops/learnings.md → summarising-agent section before starting.
+---
+
 # Skill: Summarising Agent
 
 ## Purpose

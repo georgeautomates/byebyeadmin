@@ -1,4 +1,18 @@
+---
+name: idea-generator
+category: brand-content
+depends-on: [brand-context/icp.md, brand-context/positioning.md]
+outputs: [content-ideas, campaign-angles, product-ideas]
+triggers: [ideas, brainstorm, content ideas, angles, what should I post]
+overlaps: [script-writing (executes content ideas), caption-writing (executes content ideas)]
+pre-flight: Check ops/learnings.md → idea-generator section before starting.
+---
+
 # Skill: Idea Generator
+
+## Pre-Flight
+
+Before generating: read `ops/brand-context/icp.md` (pain points, triggers, language) and `ops/brand-context/positioning.md` (what angles align with our market position). Check `ops/learnings.md` → idea-generator section for any logged corrections.
 
 ## Purpose
 

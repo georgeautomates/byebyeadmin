@@ -17,38 +17,64 @@ George's AI operating system for running ByeByeAdmin. Lives in `ops/` inside the
 | `projects/client-delivery/` | Client Delivery | Onboarding, workflow builds, reporting for haulage clients |
 | `projects/strategy/` | Strategy | Business decisions, positioning, pricing, offers |
 
-## Skills directory
+## Brand Context (Source of Truth)
 
-Skills are in `skills/`. Invoke by name when you need a specific behaviour:
+Single source of truth for all written output. **Mandatory: read before any skill that produces copy.**
 
 ```
-skills/assessment-builder.md
-skills/frontend-design.md
-skills/n8n-workflow-builder.md
-skills/script-writing.md
-skills/caption-writing.md
-skills/idea-generator.md
-skills/reflection-agent.md
-skills/skill-builder.md
-skills/email-writing.md
-skills/subject-book-writer.md
-skills/prospector-researcher.md
-skills/summarising-agent.md
-skills/memory-agent.md
-skills/claude-md-optimiser.md
+brand-context/voice.md       — tone, sentence style, hard rules, channel notes
+brand-context/positioning.md — what we are, differentiators, proof points, narrative
+brand-context/icp.md         — who we're talking to, pain points, triggers, language
+```
+
+## Skills directory
+
+Skills are in `skills/`. Invoke by name when you need a specific behaviour. All skills have front matter with `category`, `depends-on`, `triggers`, and `overlaps` for collision detection.
+
+**Mandatory rule:** Before executing any skill, check the relevant section of `ops/learnings.md` and apply any logged corrections.
+
+```
+skills/assessment-builder.md    — category: product
+skills/campaign-writer.md       — category: sales          (reads brand-context/voice + icp + positioning)
+skills/caption-writing.md       — category: brand-content  (reads brand-context/voice + icp)
+skills/client-onboarding.md     — category: client-delivery (reads brand-context/icp + positioning)
+skills/claude-md-optimiser.md   — category: meta
+skills/email-writing.md         — category: sales          (reads brand-context/voice + icp)
+skills/frontend-design.md       — category: product
+skills/heartbeat.md             — category: meta           (run at session start)
+skills/idea-generator.md        — category: brand-content  (reads brand-context/icp + positioning)
+skills/memory-agent.md          — category: meta
+skills/n8n-workflow-builder.md  — category: client-delivery
+skills/prospector-researcher.md — category: sales
+skills/reflection-agent.md      — category: strategy
+skills/reply-handler.md         — category: sales          (reads brand-context/voice + icp)
+skills/script-writing.md        — category: brand-content  (reads brand-context/voice + positioning)
+skills/skill-builder.md         — category: meta
+skills/subject-book-writer.md   — category: brand-content  (reads brand-context/voice + positioning + icp)
+skills/summarising-agent.md     — category: ops
+skills/transcription.md         — category: ops
+skills/wrap-up.md               — category: meta           (run at session end)
 ```
 
 ## Agents directory
 
-Agent definitions in `agents/`:
+Agent definitions and implementations in `agents/`:
 
 ```
-agents/morning-briefing.js   — live cron on VPS (Instantly + YouTube → Slack, 8am UTC Mon-Fri)
-agents/morning-briefing.md
-agents/analytics-update.md
-agents/prospector.md
-agents/transcription.md
-agents/memory.md
+agents/morning-briefing.js   — LIVE cron: Instantly + YouTube → Slack (8am UTC Mon-Fri)
+agents/morning-briefing.md   — spec
+agents/analytics-update.js   — LIVE cron: 7-day trends → Slack (8:30am UTC Mondays)
+agents/analytics-update.md   — spec
+agents/prospector.md         — spec only (implement: apollo → CSV → Slack)
+agents/transcription.md      — spec only (implement: voice → Whisper → structured output)
+agents/memory.md             — spec only (manual via memory-agent skill)
+```
+
+**VPS agents that produce written output** must use `agents/lib/context-loader.js`:
+```js
+import { buildSystemPrompt } from './lib/context-loader.js'
+const system = buildSystemPrompt(['skill-name'], ['voice', 'icp'])
+// pass `system` as the system prompt in your Anthropic API call
 ```
 
 ## API tools wired in (OpenClaw VPS + Claude Code)
@@ -74,6 +100,10 @@ agents/memory.md
 - Colours from `C.xxx` tokens in `lib/constants.ts`
 - All API keys in `.env` or `.env.local` (gitignored) — never hardcoded
 - Commit messages: present tense, imperative, concise
+
+## Learnings
+
+`ops/learnings.md` — structured feedback log. One section per skill. **Read the relevant section before running any skill.** Log corrections and process improvements here via the wrap-up skill.
 
 ## Memory
 

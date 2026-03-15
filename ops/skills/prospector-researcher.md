@@ -1,3 +1,13 @@
+---
+name: prospector-researcher
+category: sales
+depends-on: [brand-context/icp.md]
+outputs: [prospect-list, enriched-contacts, research-brief]
+triggers: [prospect, find leads, research, Apollo, fleet operators, contacts]
+overlaps: [email-writing (feeds into outreach)]
+pre-flight: Check ops/learnings.md → prospector-researcher section before starting.
+---
+
 # Skill: Prospector / Researcher
 
 ## Purpose

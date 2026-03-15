@@ -1,3 +1,13 @@
+---
+name: claude-md-optimiser
+category: meta
+depends-on: []
+outputs: [audit-report, updated-claude-md]
+triggers: [CLAUDE.md, audit, optimise context, review instructions, monthly audit]
+overlaps: [skill-builder (both maintain the ops system)]
+pre-flight: Check ops/learnings.md → claude-md-optimiser section before starting.
+---
+
 # Skill: CLAUDE.md Optimiser
 
 ## Purpose

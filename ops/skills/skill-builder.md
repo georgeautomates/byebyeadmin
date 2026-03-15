@@ -1,3 +1,13 @@
+---
+name: skill-builder
+category: meta
+depends-on: []
+outputs: [new-skill-file, improved-skill-file]
+triggers: [new skill, build a skill, improve skill, audit skills, monthly review]
+overlaps: [claude-md-optimiser (both maintain the ops system)]
+pre-flight: Check ops/learnings.md → skill-builder section before starting.
+---
+
 # Skill: Skill Builder & Improver
 
 ## Purpose

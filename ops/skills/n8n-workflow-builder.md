@@ -1,3 +1,13 @@
+---
+name: n8n-workflow-builder
+category: client-delivery
+depends-on: []
+outputs: [workflow-design, n8n-implementation]
+triggers: [n8n, workflow, automation, automate, trigger, integration, build a workflow]
+overlaps: []
+pre-flight: Check ops/learnings.md → n8n-workflow-builder section before starting.
+---
+
 # Skill: n8n Workflow Builder
 
 ## Purpose

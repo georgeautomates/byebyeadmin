@@ -1,4 +1,18 @@
+---
+name: caption-writing
+category: brand-content
+depends-on: [brand-context/voice.md, brand-context/icp.md]
+outputs: [instagram-caption, linkedin-post]
+triggers: [caption, Instagram, LinkedIn, post, social copy]
+overlaps: [script-writing (same channels), email-writing (short persuasive copy)]
+pre-flight: Check ops/learnings.md → caption-writing section before starting.
+---
+
 # Skill: Caption Writing
+
+## Pre-Flight
+
+Before writing: read `ops/brand-context/voice.md` (tone, hard no's, opener patterns) and `ops/brand-context/icp.md` (audience language, what resonates). Check `ops/learnings.md` → caption-writing section for any logged corrections.
 
 ## Purpose
 
