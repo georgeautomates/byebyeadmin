@@ -81,7 +81,7 @@ const system = buildSystemPrompt(['skill-name'], ['voice', 'icp'])
 
 | Tool | Purpose | Status |
 |------|---------|--------|
-| Instantly | Email campaign CRM | Live — `INSTANTLY_API_KEY` in env |
+| Instantly | Email campaign CRM | Live — `INSTANTLY_API_KEY` in env, MCP wired on Mac + VPS |
 | Apollo | Prospect enrichment | Live — `APOLLO_API_KEY` in env |
 | Apify | Web scraping | Live — `APIFY_TOKEN` in env |
 | YouTube | Channel stats | Live — `YOUTUBE_API_KEY` in env |

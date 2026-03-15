@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "instantly-mcp": {
+      "command": "npx",
+      "args": ["-y", "instantly-mcp"],
+      "env": {
+        "INSTANTLY_API_KEY": "${INSTANTLY_API_KEY}"
+      }
+    }
+  }
+}
