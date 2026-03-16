@@ -1,0 +1,9 @@
+{
+  "name": "bba-ops",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@slack/bolt": "^3.19.0"
+  }
+}
