@@ -9,10 +9,11 @@
 //   title [n], ig [n], li    — approve + include LinkedIn post
 //   skip                     — dismiss current pending content approval
 //
-// Requires: @slack/bolt  (npm install @slack/bolt in ops/)
-// Env vars: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_USER_ID, N8N_BASE_URL
+// Requires: @slack/bolt, @anthropic-ai/sdk  (npm install in ops/)
+// Env vars: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_USER_ID, N8N_BASE_URL, ANTHROPIC_API_KEY
 
 import { App } from '@slack/bolt'
+import Anthropic from '@anthropic-ai/sdk'
 import { createServer } from 'http'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
@@ -41,6 +42,7 @@ const ALLOWED_USER_ID = process.env.SLACK_USER_ID || 'U0AETR5UK4Y'
 const N8N_BASE_URL = process.env.N8N_BASE_URL || 'https://n8n.srv1155250.hstgr.cloud'
 const INTERNAL_PORT = parseInt(process.env.SLACK_LISTENER_PORT || '3001')
 const RESEARCH_SCRIPT = resolve(__dir, 'research.js')
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
 
 if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
   console.error('SLACK_BOT_TOKEN and SLACK_APP_TOKEN must be set')
@@ -58,11 +60,6 @@ const app = new App({
   token: SLACK_BOT_TOKEN,
   appToken: SLACK_APP_TOKEN,
   socketMode: true,
-})
-
-// ── Debug: log all received messages ─────────────────────────
-app.message(async ({ message }) => {
-  console.log(`[debug] message received — user:${message.user} type:${message.channel_type} text:"${message.text}"`)
 })
 
 // ── Route: last30 [topic] ────────────────────────────────────
@@ -154,6 +151,37 @@ app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, co
   } catch (err) {
     console.error('[content] Failed to resume n8n workflow:', err.message)
     await say(`Failed to schedule: \`${err.message}\``)
+  }
+})
+
+// ── Fallback: route all other DMs through Claude ─────────────
+app.message(async ({ message, say }) => {
+  if (message.user !== ALLOWED_USER_ID) return
+  if (!message.text || message.subtype) return
+
+  console.log(`[claude] DM from ${message.user}: "${message.text?.slice(0, 80)}"`)
+
+  if (!ANTHROPIC_API_KEY) {
+    await say('Commands: `last30 [topic]` | `title [n], ig [n]` | `skip`')
+    return
+  }
+
+  try {
+    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY })
+    const systemPrompt = readFileSync(resolve(__dir, '../brand-context/voice.md'), 'utf-8').slice(0, 2000)
+
+    const response = await anthropic.messages.create({
+      model: 'claude-opus-4-6',
+      max_tokens: 1024,
+      system: `You are OpenClaw, George's AI business assistant running on his VPS. You help him run ByeByeAdmin, a UK haulage AI automation company. Be concise — Slack messages, not essays. You can discuss strategy, review ideas, answer questions, and help plan work. You cannot directly execute tasks (file edits, deployments, API calls) but you can advise clearly on what to do or suggest commands.\n\nBrand voice context:\n${systemPrompt}`,
+      messages: [{ role: 'user', content: message.text }],
+    })
+
+    const reply = response.content[0]?.text
+    if (reply) await say(reply)
+  } catch (err) {
+    console.error('[claude] Error:', err.message)
+    await say(`Error: \`${err.message}\``)
   }
 })
 
