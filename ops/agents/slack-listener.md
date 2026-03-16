@@ -49,14 +49,13 @@ Wants=network-online.target
 Type=simple
 User=openclaw
 WorkingDirectory=/home/openclaw/byebyeadmin/ops
-ExecStart=/usr/bin/node /home/openclaw/byebyeadmin/ops/agents/slack-listener.js
+ExecStart=/home/openclaw/.nvm/versions/node/v22.22.1/bin/node /home/openclaw/byebyeadmin/ops/agents/slack-listener.js
 Restart=always
 RestartSec=10
 
 Environment=SLACK_BOT_TOKEN=xoxb-...
 Environment=SLACK_APP_TOKEN=xapp-...
 Environment=SLACK_USER_ID=U0AETR5UK4Y
-Environment=SCRAPECREATORS_API_KEY=...
 
 [Install]
 WantedBy=multi-user.target
