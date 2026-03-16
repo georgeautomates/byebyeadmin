@@ -16,6 +16,7 @@ George's AI operating system for running ByeByeAdmin. Lives in `ops/` inside the
 | `projects/brand-content/` | Brand & Content | IG/YT/LinkedIn content, captions, scripts, ideas |
 | `projects/client-delivery/` | Client Delivery | Onboarding, workflow builds, reporting for haulage clients |
 | `projects/strategy/` | Strategy | Business decisions, positioning, pricing, offers |
+| `projects/website-builds/` | Website Builds | Site development, landing pages, assessment funnel |
 
 ## Brand Context (Source of Truth)
 
@@ -65,6 +66,11 @@ agents/morning-briefing.js   — LIVE cron: Instantly + YouTube → Slack (8am U
 agents/morning-briefing.md   — spec
 agents/analytics-update.js   — LIVE cron: 7-day trends → Slack (8:30am UTC Mondays)
 agents/analytics-update.md   — spec
+agents/research.js           — LIVE on-demand: last30days research → Slack (triggered by slack-listener)
+agents/research.md           — spec
+agents/slack-listener.js     — LIVE service: Socket Mode inbound handler, routes "last30 [topic]" DMs
+agents/slack-listener.md     — spec (includes VPS setup + systemd service config)
+agents/lib/context-loader.js — shared utility: loads skills/brand-context/learnings for VPS agents
 agents/prospector.md         — spec only (implement: apollo → CSV → Slack)
 agents/transcription.md      — spec only (implement: voice → Whisper → structured output)
 agents/memory.md             — spec only (manual via memory-agent skill)
