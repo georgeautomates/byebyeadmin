@@ -12,7 +12,8 @@
 // Requires: @slack/bolt, @anthropic-ai/sdk  (npm install in ops/)
 // Env vars: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_USER_ID, N8N_BASE_URL, ANTHROPIC_API_KEY
 
-import { App } from '@slack/bolt'
+import boltPkg from '@slack/bolt'
+const { App } = boltPkg
 import Anthropic from '@anthropic-ai/sdk'
 import { createServer } from 'http'
 import { readFileSync } from 'fs'
