@@ -156,14 +156,15 @@ app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, co
 })
 
 // ── Fallback: route all other DMs through Claude ─────────────
-app.message(async ({ message, say }) => {
+app.message(async ({ message, say, client }) => {
   if (message.user !== ALLOWED_USER_ID) return
   if (!message.text || message.subtype) return
 
-  console.log(`[claude] DM from ${message.user}: "${message.text?.slice(0, 80)}"`)
+  const threadTs = message.thread_ts || message.ts
+  console.log(`[claude] DM from ${message.user} thread:${threadTs}: "${message.text?.slice(0, 80)}"`)
 
   if (!ANTHROPIC_API_KEY) {
-    await say('Commands: `last30 [topic]` | `title [n], ig [n]` | `skip`')
+    await say({ text: 'Commands: `last30 [topic]` | `title [n], ig [n]` | `skip`', thread_ts: threadTs })
     return
   }
 
@@ -171,18 +172,28 @@ app.message(async ({ message, say }) => {
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY })
     const systemPrompt = readFileSync(resolve(__dir, '../brand-context/voice.md'), 'utf-8').slice(0, 2000)
 
+    // Fetch full thread history so Claude has conversation context
+    const { messages: thread } = await client.conversations.replies({
+      channel: message.channel,
+      ts: threadTs,
+    })
+
+    const history = thread
+      .filter(m => !m.subtype && m.text)
+      .map(m => ({ role: m.bot_id ? 'assistant' : 'user', content: m.text }))
+
     const response = await anthropic.messages.create({
       model: 'claude-opus-4-6',
       max_tokens: 1024,
       system: `You are OpenClaw, George's AI business assistant running on his VPS. You help him run ByeByeAdmin, a UK haulage AI automation company. Be concise — Slack messages, not essays. You can discuss strategy, review ideas, answer questions, and help plan work. You cannot directly execute tasks (file edits, deployments, API calls) but you can advise clearly on what to do or suggest commands.\n\nBrand voice context:\n${systemPrompt}`,
-      messages: [{ role: 'user', content: message.text }],
+      messages: history,
     })
 
     const reply = response.content[0]?.text
-    if (reply) await say(reply)
+    if (reply) await say({ text: reply, thread_ts: threadTs })
   } catch (err) {
     console.error('[claude] Error:', err.message)
-    await say(`Error: \`${err.message}\``)
+    await say({ text: `Error: \`${err.message}\``, thread_ts: threadTs })
   }
 })
 
