@@ -8,6 +8,7 @@ import { C, FONT } from '@/lib/constants';
 const NAV_ITEMS = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
+  { href: '/blog', label: 'Blog' },
   { href: '/assessment', label: 'Assess My Fleet' },
   { href: '/contact', label: 'Contact' },
 ];
