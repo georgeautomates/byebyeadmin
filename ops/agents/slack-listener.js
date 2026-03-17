@@ -37,6 +37,10 @@ function loadEnv() {
 }
 loadEnv()
 
+// Prevent stray WebSocket/network errors from crashing the process
+process.on('uncaughtException', (err) => console.error('[fatal] Uncaught exception:', err.message))
+process.on('unhandledRejection', (reason) => console.error('[fatal] Unhandled rejection:', reason))
+
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN
 const ALLOWED_USER_ID = process.env.SLACK_USER_ID || 'U0AETR5UK4Y'
@@ -44,6 +48,9 @@ const N8N_BASE_URL = process.env.N8N_BASE_URL || 'https://n8n.srv1155250.hstgr.c
 const INTERNAL_PORT = parseInt(process.env.SLACK_LISTENER_PORT || '3001')
 const RESEARCH_SCRIPT = resolve(__dir, 'research.js')
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
+const anthropic = ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: ANTHROPIC_API_KEY, maxRetries: 3 })
+  : null
 
 if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
   console.error('SLACK_BOT_TOKEN and SLACK_APP_TOKEN must be set')
@@ -163,13 +170,12 @@ app.message(async ({ message, say, client }) => {
   const threadTs = message.thread_ts || message.ts
   console.log(`[claude] DM from ${message.user} thread:${threadTs}: "${message.text?.slice(0, 80)}"`)
 
-  if (!ANTHROPIC_API_KEY) {
+  if (!anthropic) {
     await say({ text: 'Commands: `last30 [topic]` | `title [n], ig [n]` | `skip`', thread_ts: threadTs })
     return
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY })
     const systemPrompt = readFileSync(resolve(__dir, '../brand-context/voice.md'), 'utf-8').slice(0, 2000)
 
     // Fetch full thread history so Claude has conversation context
