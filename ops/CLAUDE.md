@@ -121,6 +121,22 @@ The VPS clones the `byebyeadmin` repo and pulls every 15 minutes via cron. Push 
 
 VPS path: `/home/openclaw/byebyeadmin/ops/`
 
+## Strategic direction (March 2026)
+
+**Decision made. Research complete.** Full files:
+- `projects/strategy/strategic-direction-2026.md` — final recommendation + 90-day action plan
+- `projects/strategy/master-research-2026.md` — all research (6 agents, NotebookLM analysis, 30+ sources)
+
+**One-line verdict:** Become the only UK (and global) creator teaching AI automation specifically for logistics and transport operations. LinkedIn first. Close 2 more clients from existing outreach in 90 days. YouTube from month 9.
+
+Key data points:
+- Zero creators in UK logistics AI niche — globally, not just UK
+- "AI in logistics" hit Google Trends 100 Jan 2026 (record high, +156% in 90 days)
+- LinkedIn first: 60–120 days to clients. YouTube: 6–18 month horizon.
+- Skool community is the revenue engine (55–65% of total for top creators) — not YouTube AdSense (2–5%)
+- Revenue ramp: £8–12k/mo by month 3, £18–25k/mo by month 12
+- Path B (UK Logistics AI Authority) confirmed — not broad SME, not haulage-only
+
 ## Business context
 
 **ByeByeAdmin** — AI automation for UK haulage fleets (3–100 vehicles). Based in Kent.
