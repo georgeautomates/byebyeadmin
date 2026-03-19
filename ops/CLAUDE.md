@@ -126,6 +126,9 @@ VPS path: `/home/openclaw/byebyeadmin/ops/`
 **Decision made. Research complete.** Full files:
 - `projects/strategy/strategic-direction-2026.md` — final recommendation + 90-day action plan
 - `projects/strategy/master-research-2026.md` — all research (6 agents, NotebookLM analysis, 30+ sources)
+- `projects/strategy/sme-channel-validation-2026.md` — UK SME AI YouTube gap research (6 agents): gap is real and vacant, but sequential strategy confirmed (logistics first, SME channel at month 9–12)
+- `projects/strategy/agency-growth-channels-2026.md` — how AI automation agencies actually grow (6 agents): referrals 60–70%, LinkedIn, cold outreach. YouTube <1%. All named creators had agencies before channels.
+- `projects/strategy/first-client-unconventional-2026.md` — out-of-the-box first client tactics (6 agents): private podcast (10% conversion), free audit, FORS/DVSA compliance entry, adjacent provider referrals, trade association routes. 90-day action list.
 
 **One-line verdict:** Become the only UK (and global) creator teaching AI automation specifically for logistics and transport operations. LinkedIn first. Close 2 more clients from existing outreach in 90 days. YouTube from month 9.
 
@@ -136,6 +139,13 @@ Key data points:
 - Skool community is the revenue engine (55–65% of total for top creators) — not YouTube AdSense (2–5%)
 - Revenue ramp: £8–12k/mo by month 3, £18–25k/mo by month 12
 - Path B (UK Logistics AI Authority) confirmed — not broad SME, not haulage-only
+
+**Top non-obvious client acquisition tactics (Month 1 priorities):**
+- Private podcast inviting prospects as guests — 10% guest-to-client conversion, no audience needed
+- Free compliance audit offer — 5–12% conversion, quantify DVSA/FORS exposure in pounds
+- FORS Supplier Affiliation (£300–600/yr) — directory of operators in buying mode
+- Referral arrangement with existing client's accountant and fleet insurance broker
+- WhatsApp follow-up step for stalled Instantly leads
 
 ## Business context
 

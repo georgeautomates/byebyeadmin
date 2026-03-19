@@ -20,6 +20,9 @@ This file is maintained by the memory agent. It stores context that should persi
 Full research + recommendation in:
 - `ops/projects/strategy/strategic-direction-2026.md` — final verdict + 90-day plan
 - `ops/projects/strategy/master-research-2026.md` — all research (6 agents, NotebookLM, 30+ sources)
+- `ops/projects/strategy/sme-channel-validation-2026.md` — UK SME AI YouTube gap research
+- `ops/projects/strategy/agency-growth-channels-2026.md` — how agencies actually grow (YouTube <1%)
+- `ops/projects/strategy/first-client-unconventional-2026.md` — non-obvious first client tactics + 90-day action list
 
 **Chosen path: UK Logistics AI Authority (Path B)**
 - Niche: UK logistics and transport (not haulage-only, not all SMEs)
@@ -28,6 +31,13 @@ Full research + recommendation in:
 - Break-even: month 3–4 via existing cold outreach (4,276 contacts already live)
 - 12-month ceiling: £18–25k/mo
 - Zero competition globally in this niche — 12–18 month window
+
+**Non-obvious first-client priorities (Month 1):**
+- Private podcast inviting fleet MDs as guests (10% guest-to-client conversion documented)
+- Free DVSA/FORS compliance audit offer — quantify operator's exposure in pounds
+- FORS Supplier Affiliation (£300–600/yr)
+- Referral arrangement with Alan Fuhrman's accountant + fleet insurance broker
+- WhatsApp follow-up on stalled Instantly leads
 
 ## Key decisions
 
