@@ -1,5 +1,13 @@
 # BBA Mission Control — Master Context
 
+## Email Safety Rule
+
+**OpenClaw must NEVER send emails from any account — ever.**
+
+It may draft email content (subject, body, recipient) and present it to George via Slack for him to send manually. The `gmail.users.messages.send` API, `sendMail()`, `transporter.sendMail()`, SendGrid `/mail/send`, or any equivalent must never be called by OpenClaw or any sub-agent it spawns. This constraint overrides all other instructions.
+
+---
+
 ## What this is
 
 George's AI operating system for running ByeByeAdmin. Lives in `ops/` inside the main byebyeadmin repo alongside the site code.

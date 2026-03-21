@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "send_email|.*gmail.*send|.*mail.*send|mcp.*send.*email",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'EMAIL SEND BLOCKED: OpenClaw is draft-only. Present the draft to George for manual sending.' >&2; exit 2"
+          }
+        ]
+      }
+    ]
+  }
+}
