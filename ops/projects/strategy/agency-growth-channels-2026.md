@@ -1,3 +1,4 @@
+
 # How AI Automation Agencies Actually Grow
 _March 2026. 6 research agents, 50+ searches, 30+ sources._
 
