@@ -304,6 +304,7 @@ app.message(async ({ message, say, client }) => {
     const history = thread
       .filter(m => !m.subtype && m.text)
       .map(m => ({ role: m.bot_id ? 'assistant' : 'user', content: m.text }))
+      .slice(-10)
 
     const systemMsg = {
       role: 'system',
