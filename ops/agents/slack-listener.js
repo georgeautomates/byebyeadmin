@@ -9,12 +9,12 @@
 //   title [n], ig [n], li    — approve + include LinkedIn post
 //   skip                     — dismiss current pending content approval
 //
-// Requires: @slack/bolt, @anthropic-ai/sdk  (npm install in ops/)
-// Env vars: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_USER_ID, N8N_BASE_URL, ANTHROPIC_API_KEY
+// Requires: @slack/bolt, openai  (npm install in ops/)
+// Env vars: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_USER_ID, N8N_BASE_URL, GEMINI_API_KEY, GROQ_API_KEY, OPENAI_API_KEY
 
 import boltPkg from '@slack/bolt'
 const { App } = boltPkg
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { createServer } from 'http'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
@@ -47,10 +47,30 @@ const ALLOWED_USER_ID = process.env.SLACK_USER_ID || 'U0AETR5UK4Y'
 const N8N_BASE_URL = process.env.N8N_BASE_URL || 'https://n8n.srv1155250.hstgr.cloud'
 const INTERNAL_PORT = parseInt(process.env.SLACK_LISTENER_PORT || '3001')
 const RESEARCH_SCRIPT = resolve(__dir, 'research.js')
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY
-const anthropic = ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: ANTHROPIC_API_KEY, maxRetries: 3 })
-  : null
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+const GROQ_API_KEY = process.env.GROQ_API_KEY
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+
+const LLM_PROVIDERS = [
+  GEMINI_API_KEY && {
+    name: 'gemini',
+    model: 'gemini-1.5-flash',
+    client: new OpenAI({
+      apiKey: GEMINI_API_KEY,
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    }),
+  },
+  GROQ_API_KEY && {
+    name: 'groq',
+    model: 'llama-3.3-70b-versatile',
+    client: new OpenAI({ apiKey: GROQ_API_KEY, baseURL: 'https://api.groq.com/openai/v1' }),
+  },
+  OPENAI_API_KEY && {
+    name: 'openai',
+    model: 'gpt-4o',
+    client: new OpenAI({ apiKey: OPENAI_API_KEY }),
+  },
+].filter(Boolean)
 
 if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
   console.error('SLACK_BOT_TOKEN and SLACK_APP_TOKEN must be set')
@@ -162,23 +182,24 @@ app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, co
   }
 })
 
-// ── Fallback: route all other DMs through Claude ─────────────
+// ── Fallback: route all other DMs through LLM cascade ────────
+// Tries providers in order: Gemini → Groq → OpenAI. Falls through on 429/rate-limit.
 app.message(async ({ message, say, client }) => {
   if (message.user !== ALLOWED_USER_ID) return
   if (!message.text || message.subtype) return
 
   const threadTs = message.thread_ts || message.ts
-  console.log(`[claude] DM from ${message.user} thread:${threadTs}: "${message.text?.slice(0, 80)}"`)
+  console.log(`[llm] DM from ${message.user} thread:${threadTs}: "${message.text?.slice(0, 80)}"`)
 
-  if (!anthropic) {
-    await say({ text: 'Commands: `last30 [topic]` | `title [n], ig [n]` | `skip`', thread_ts: threadTs })
+  if (!LLM_PROVIDERS.length) {
+    await say({ text: 'No LLM configured. Commands: `last30 [topic]` | `title [n], ig [n]` | `skip`', thread_ts: threadTs })
     return
   }
 
   try {
     const systemPrompt = readFileSync(resolve(__dir, '../brand-context/voice.md'), 'utf-8').slice(0, 2000)
 
-    // Fetch full thread history so Claude has conversation context
+    // Fetch full thread history for conversation context
     const { messages: thread } = await client.conversations.replies({
       channel: message.channel,
       ts: threadTs,
@@ -188,17 +209,36 @@ app.message(async ({ message, say, client }) => {
       .filter(m => !m.subtype && m.text)
       .map(m => ({ role: m.bot_id ? 'assistant' : 'user', content: m.text }))
 
-    const response = await anthropic.messages.create({
-      model: 'claude-opus-4-6',
-      max_tokens: 1024,
-      system: `You are OpenClaw, George's AI business assistant running on his VPS. You help him run ByeByeAdmin, a UK haulage AI automation company. Be concise — Slack messages, not essays. You can discuss strategy, review ideas, answer questions, and help plan work. You cannot directly execute tasks (file edits, deployments, API calls) but you can advise clearly on what to do or suggest commands.\n\nEMAIL CONSTRAINT: You must NEVER send emails or trigger any action that sends an email. You may draft email content (subject, body, to/cc) and present it to George so he can send it manually. This is an absolute restriction.\n\nBrand voice context:\n${systemPrompt}`,
-      messages: history,
-    })
+    const systemMsg = {
+      role: 'system',
+      content: `You are OpenClaw, George's AI business assistant running on his VPS. You help him run ByeByeAdmin, a UK haulage AI automation company. Be concise — Slack messages, not essays. You can discuss strategy, review ideas, answer questions, and help plan work. You cannot directly execute tasks (file edits, deployments, API calls) but you can advise clearly on what to do or suggest commands.\n\nEMAIL CONSTRAINT: You must NEVER send emails or trigger any action that sends an email. You may draft email content (subject, body, to/cc) and present it to George so he can send it manually. This is an absolute restriction.\n\nBrand voice context:\n${systemPrompt}`,
+    }
 
-    const reply = response.content[0]?.text
+    let reply = null
+    for (const provider of LLM_PROVIDERS) {
+      try {
+        console.log(`[llm] trying ${provider.name} (${provider.model})`)
+        const response = await provider.client.chat.completions.create({
+          model: provider.model,
+          max_tokens: 1024,
+          messages: [systemMsg, ...history],
+        })
+        reply = response.choices[0].message.content
+        console.log(`[llm] responded via ${provider.name}`)
+        break
+      } catch (err) {
+        const isRateLimit = err.status === 429 || err.message?.includes('quota') || err.message?.includes('rate')
+        if (isRateLimit && LLM_PROVIDERS.indexOf(provider) < LLM_PROVIDERS.length - 1) {
+          console.warn(`[llm] ${provider.name} rate-limited, falling back...`)
+          continue
+        }
+        throw err
+      }
+    }
+
     if (reply) await say({ text: reply, thread_ts: threadTs })
   } catch (err) {
-    console.error('[claude] Error:', err.message)
+    console.error('[llm] Error:', err.message)
     await say({ text: `Error: \`${err.message}\``, thread_ts: threadTs })
   }
 })
