@@ -56,7 +56,7 @@ const CLAUDE_TRIGGER_ID = process.env.CLAUDE_TRIGGER_ID
 const LLM_PROVIDERS = [
   GEMINI_API_KEY && {
     name: 'gemini',
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash',
     client: new OpenAI({
       apiKey: GEMINI_API_KEY,
       baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
@@ -323,9 +323,8 @@ app.message(async ({ message, say, client }) => {
         console.log(`[llm] responded via ${provider.name}`)
         break
       } catch (err) {
-        const isRateLimit = err.status === 429 || err.message?.includes('quota') || err.message?.includes('rate')
-        if (isRateLimit && LLM_PROVIDERS.indexOf(provider) < LLM_PROVIDERS.length - 1) {
-          console.warn(`[llm] ${provider.name} rate-limited, falling back...`)
+        if (LLM_PROVIDERS.indexOf(provider) < LLM_PROVIDERS.length - 1) {
+          console.warn(`[llm] ${provider.name} failed (${err.message}), falling back...`)
           continue
         }
         throw err
