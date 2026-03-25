@@ -50,6 +50,8 @@ const RESEARCH_SCRIPT = resolve(__dir, 'research.js')
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const GROQ_API_KEY = process.env.GROQ_API_KEY
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+const CLAUDE_ACCESS_TOKEN = process.env.CLAUDE_ACCESS_TOKEN
+const CLAUDE_TRIGGER_ID = process.env.CLAUDE_TRIGGER_ID
 
 const LLM_PROVIDERS = [
   GEMINI_API_KEY && {
@@ -179,6 +181,100 @@ app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, co
   } catch (err) {
     console.error('[content] Failed to resume n8n workflow:', err.message)
     await say(`Failed to schedule: \`${err.message}\``)
+  }
+})
+
+// ── Route: agent: [task] — dispatch to Claude Code remote agent ──
+// Syntax: "agent: write a caption about X"
+// Updates the remote trigger prompt with the task + Slack coords, then fires it.
+// The CCR agent posts results back to this thread via Slack MCP.
+app.message(/^agent:\s*([\s\S]+)/i, async ({ message, say, context }) => {
+  if (message.user !== ALLOWED_USER_ID) return
+
+  const task = context.matches[1].trim()
+  const threadTs = message.thread_ts || message.ts
+  const channel = message.channel
+
+  console.log(`[agent] Dispatching: "${task.slice(0, 80)}"`)
+
+  if (!CLAUDE_ACCESS_TOKEN || !CLAUDE_TRIGGER_ID) {
+    await say({ text: 'Agent not configured. Missing `CLAUDE_ACCESS_TOKEN` or `CLAUDE_TRIGGER_ID`.', thread_ts: threadTs })
+    return
+  }
+
+  await say({ text: `Dispatching to Claude Code... results will appear here when done.`, thread_ts: threadTs })
+
+  const prompt = `You are a Claude Code sub-agent dispatched by OpenClaw (George's Slack bot) to complete a task.
+
+TASK: ${task}
+SLACK_CHANNEL: ${channel}
+SLACK_THREAD: ${threadTs}
+
+Instructions:
+1. Read ops/CLAUDE.md for full project context
+2. Read ops/brand-context/voice.md before any task involving copy or strategy
+3. Check ops/learnings.md for the relevant skill section if running a named skill
+4. Complete the task thoroughly using the repo files and your reasoning
+5. Post your complete results to Slack channel ${channel} in thread ${threadTs} using the Slack MCP tool
+
+The repo is byebyeadmin — a UK haulage AI automation business. All ops context is in ops/.`
+
+  const headers = {
+    'Authorization': `Bearer ${CLAUDE_ACCESS_TOKEN}`,
+    'Content-Type': 'application/json',
+    'anthropic-version': '2023-06-01',
+  }
+
+  try {
+    // Inject current task into trigger prompt
+    const updateRes = await fetch(`https://api.claude.ai/v1/code/triggers/${CLAUDE_TRIGGER_ID}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        job_config: {
+          ccr: {
+            environment_id: 'env_011WwFnvUrimXhUbsRai7z26',
+            session_context: {
+              model: 'claude-sonnet-4-6',
+              sources: [{ git_repository: { url: 'https://github.com/georgeautomates/byebyeadmin' } }],
+              allowed_tools: ['Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep'],
+            },
+            events: [{
+              data: {
+                uuid: '7a2f4e8b-3c15-4d92-b861-9f0e1a523d78',
+                session_id: '',
+                type: 'user',
+                parent_tool_use_id: null,
+                message: { role: 'user', content: prompt },
+              },
+            }],
+          },
+        },
+      }),
+    })
+
+    if (!updateRes.ok) {
+      const err = await updateRes.text()
+      throw new Error(`Trigger update failed (${updateRes.status}): ${err}`)
+    }
+
+    // Fire the trigger
+    const runRes = await fetch(`https://api.claude.ai/v1/code/triggers/${CLAUDE_TRIGGER_ID}/run`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({}),
+    })
+
+    if (!runRes.ok) {
+      const err = await runRes.text()
+      throw new Error(`Trigger run failed (${runRes.status}): ${err}`)
+    }
+
+    const runData = await runRes.json()
+    console.log(`[agent] Dispatched, run id: ${runData?.run?.id || JSON.stringify(runData)}`)
+  } catch (err) {
+    console.error('[agent] Error:', err.message)
+    await say({ text: `Agent dispatch failed: \`${err.message}\``, thread_ts: threadTs })
   }
 })
 
