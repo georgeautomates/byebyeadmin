@@ -10,12 +10,15 @@
 //   skip                     — dismiss current pending content approval
 //
 // Requires: @slack/bolt, openai  (npm install in ops/)
-// Env vars: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_USER_ID, N8N_BASE_URL, GEMINI_API_KEY, GROQ_API_KEY, OPENAI_API_KEY
+// Env vars: SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_USER_ID, GEMINI_API_KEY, GROQ_API_KEY, OPENAI_API_KEY
+//           BUFFER_TOKEN, GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, GOOGLE_DRIVE_REFRESH_TOKEN
+//           GOOGLE_CONTENT_SHEET_ID
 
 import boltPkg from '@slack/bolt'
 const { App } = boltPkg
 import OpenAI from 'openai'
 import { createServer } from 'http'
+import https from 'https'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -48,8 +51,14 @@ const ALLOWED_USERS = new Set([
   ALLOWED_USER_ID,
   ...(process.env.SLACK_EXTRA_USERS || 'U0AE35DN7JQ').split(',').map(s => s.trim()).filter(Boolean),
 ])
-const N8N_BASE_URL = process.env.N8N_BASE_URL || 'https://n8n.srv1155250.hstgr.cloud'
 const INTERNAL_PORT = parseInt(process.env.SLACK_LISTENER_PORT || '3001')
+const BUFFER_TOKEN          = process.env.BUFFER_TOKEN
+const GOOGLE_CLIENT_ID      = process.env.GOOGLE_DRIVE_CLIENT_ID
+const GOOGLE_CLIENT_SECRET  = process.env.GOOGLE_DRIVE_CLIENT_SECRET
+const GOOGLE_REFRESH_TOKEN  = process.env.GOOGLE_DRIVE_REFRESH_TOKEN
+const CONTENT_SHEET_ID      = process.env.GOOGLE_CONTENT_SHEET_ID || '1Wx7J-m97iyXnK4_XxvtaAdnXW-FpB77hQI91mw4Lo7c'
+const YT_CHANNEL_ID         = '69b7df3d7be9f8b1715f313c'
+const IG_CHANNEL_ID         = '69b7de067be9f8b1715f2df4'
 const RESEARCH_SCRIPT = resolve(__dir, 'research.js')
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const GROQ_API_KEY = process.env.GROQ_API_KEY
@@ -83,10 +92,81 @@ if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
   process.exit(1)
 }
 
+// ── API helpers ───────────────────────────────────────────────
+function httpreq(options, body) {
+  return new Promise((resolve, reject) => {
+    const r = https.request(options, (res) => {
+      const chunks = []
+      res.on('data', c => chunks.push(c))
+      res.on('end', () => {
+        const raw = Buffer.concat(chunks).toString()
+        try { resolve({ status: res.statusCode, body: JSON.parse(raw), raw }) }
+        catch { resolve({ status: res.statusCode, body: null, raw }) }
+      })
+    })
+    r.on('error', reject)
+    if (body) r.write(typeof body === 'string' ? body : JSON.stringify(body))
+    r.end()
+  })
+}
+
+let _googleToken = null
+let _tokenExpiry = 0
+async function getGoogleToken() {
+  if (_googleToken && Date.now() < _tokenExpiry - 60000) return _googleToken
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: GOOGLE_CLIENT_ID,
+    client_secret: GOOGLE_CLIENT_SECRET,
+    refresh_token: GOOGLE_REFRESH_TOKEN,
+  }).toString()
+  const res = await httpreq({
+    hostname: 'oauth2.googleapis.com',
+    path: '/token',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
+  }, body)
+  if (!res.body?.access_token) throw new Error(`Google token refresh failed: ${res.raw}`)
+  _googleToken = res.body.access_token
+  _tokenExpiry = Date.now() + (res.body.expires_in * 1000)
+  return _googleToken
+}
+
+async function appendSheet(sheetId, tab, values) {
+  const token = await getGoogleToken()
+  const range = encodeURIComponent(`${tab}!A1`)
+  const body = JSON.stringify({ values })
+  const res = await httpreq({
+    hostname: 'sheets.googleapis.com',
+    path: `/v4/spreadsheets/${sheetId}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+  }, body)
+  if (res.status !== 200) throw new Error(`Sheets append failed (${res.status}): ${res.raw.slice(0, 200)}`)
+}
+
+async function bufferCreatePost(channelId, text, scheduledAt) {
+  const body = new URLSearchParams({
+    profile_ids: channelId,
+    text,
+    scheduled_at: scheduledAt,
+    access_token: BUFFER_TOKEN,
+    now: 'false',
+    top: 'false',
+  }).toString()
+  const res = await httpreq({
+    hostname: 'api.bufferapp.com',
+    path: '/1/updates/create.json',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
+  }, body)
+  if (res.status !== 200 || !res.body?.success) throw new Error(`Buffer post failed (${res.status}): ${res.raw.slice(0, 200)}`)
+  return res.body
+}
+
 // ── Pending content approvals ────────────────────────────────
-// Tracks the most recent content approval waiting for George's selection.
-// n8n registers a pending approval by POSTing to localhost:3001/register-approval
-// with: { token, resumeUrl, filename }
+// Content pipeline registers approval by POSTing to localhost:3001/register-approval
+// with: { token, filename, driveFileId, transcript, options, scheduleDate }
 const pendingApprovals = new Map()
 
 // ── Slack Bolt app ───────────────────────────────────────────
@@ -156,34 +236,55 @@ app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, co
 
   const pending = pendingApprovals.get('latest')
   if (!pending) {
-    await say('No pending content approval found. The n8n workflow may have expired or already been processed.')
+    await say('No pending content approval found. It may have already been processed or the pipeline hasn\'t run yet.')
     return
   }
 
   await say(`Scheduling to Buffer: title ${titleIndex}, IG caption ${captionIndex}${includeLi ? ', LinkedIn' : ''}...`)
 
   try {
-    const response = await fetch(pending.resumeUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        titleIndex,
-        captionIndex,
-        includeLi,
-        scheduleAt: null,
-      }),
-    })
+    const { options, transcript, filename, driveFileId, scheduleDate } = pending
+    const title     = options.titles[titleIndex - 1]
+    const igCaption = options.igCaptions[captionIndex - 1]
+    const ytDesc    = options.ytDescription || ''
+    const liPost    = includeLi ? options.linkedinPost : null
 
-    if (!response.ok) {
-      const text = await response.text()
-      throw new Error(`n8n resume failed (${response.status}): ${text}`)
-    }
+    if (!title)     throw new Error(`Title ${titleIndex} not found in options`)
+    if (!igCaption) throw new Error(`IG caption ${captionIndex} not found in options`)
+
+    // Post to Buffer: YouTube (title + description) and Instagram (caption)
+    const [ytResult, igResult] = await Promise.all([
+      bufferCreatePost(YT_CHANNEL_ID, `${title}\n\n${ytDesc}`, scheduleDate),
+      bufferCreatePost(IG_CHANNEL_ID, igCaption, scheduleDate),
+    ])
+    console.log(`[content] Buffer YT draft: ${ytResult?.updates?.[0]?.id || 'ok'}`)
+    console.log(`[content] Buffer IG draft: ${igResult?.updates?.[0]?.id || 'ok'}`)
+
+    const scheduleDateStr = new Date(scheduleDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+
+    // Log to Raw Transcripts sheet
+    const now = new Date().toISOString().slice(0, 10)
+    await appendSheet(CONTENT_SHEET_ID, 'Raw Transcripts', [[
+      now, filename, transcript || '',
+      options.titles.join(' | '), options.igCaptions.join(' | '),
+      options.linkedinPost || '', ytDesc,
+      title, igCaption, liPost || '',
+    ]])
+
+    // Mark as processed
+    await appendSheet(CONTENT_SHEET_ID, 'Processed Videos', [[driveFileId, filename, now]])
 
     pendingApprovals.delete('latest')
-    console.log('[content] n8n workflow resumed successfully')
-    // Confirmation DM is sent by the "Confirm to Slack" node in n8n
+    console.log('[content] Scheduled to Buffer and logged to Sheets')
+
+    await say(
+      `Scheduled for *${scheduleDateStr}*\n` +
+      `*YT:* ${title}\n` +
+      `*IG:* ${igCaption.slice(0, 80)}...` +
+      (liPost ? `\n*LinkedIn:* ${liPost.slice(0, 80)}...` : '')
+    )
   } catch (err) {
-    console.error('[content] Failed to resume n8n workflow:', err.message)
+    console.error('[content] Failed to schedule:', err.message)
     await say(`Failed to schedule: \`${err.message}\``)
   }
 })
@@ -343,10 +444,10 @@ app.message(async ({ message, say, client }) => {
   }
 })
 
-// ── Internal HTTP server: n8n registers pending approvals ────
-// n8n's "Store Resume URL" node POSTs here after sending the Slack options message:
+// ── Internal HTTP server: content-pipeline registers pending approvals ──
+// content-pipeline.js POSTs here after sending the Slack options message:
 //   POST http://127.0.0.1:3001/register-approval
-//   Body: { token: "abc12345", resumeUrl: "https://n8n.../webhook-waiting/...", filename: "..." }
+//   Body: { token, filename, driveFileId, transcript, options, scheduleDate }
 createServer((req, res) => {
   if (req.method !== 'POST' || req.url !== '/register-approval') {
     res.writeHead(404)
