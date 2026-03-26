@@ -44,6 +44,10 @@ process.on('unhandledRejection', (reason) => console.error('[fatal] Unhandled re
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN
 const ALLOWED_USER_ID = process.env.SLACK_USER_ID || 'U0AETR5UK4Y'
+const ALLOWED_USERS = new Set([
+  ALLOWED_USER_ID,
+  ...(process.env.SLACK_EXTRA_USERS || 'U0AE35DN7JQ').split(',').map(s => s.trim()).filter(Boolean),
+])
 const N8N_BASE_URL = process.env.N8N_BASE_URL || 'https://n8n.srv1155250.hstgr.cloud'
 const INTERNAL_PORT = parseInt(process.env.SLACK_LISTENER_PORT || '3001')
 const RESEARCH_SCRIPT = resolve(__dir, 'research.js')
@@ -94,7 +98,7 @@ const app = new App({
 
 // ── Route: last30 [topic] ────────────────────────────────────
 app.message(/^last30\s+(.+)/i, async ({ message, say, context }) => {
-  if (message.user !== ALLOWED_USER_ID) return
+  if (!ALLOWED_USERS.has(message.user)) return
 
   const topic = context.matches[1].trim()
   console.log(`[last30] Received request for: "${topic}"`)
@@ -127,7 +131,7 @@ app.message(/^last30\s+(.+)/i, async ({ message, say, context }) => {
 
 // ── Route: skip ──────────────────────────────────────────────
 app.message(/^skip$/i, async ({ message, say }) => {
-  if (message.user !== ALLOWED_USER_ID) return
+  if (!ALLOWED_USERS.has(message.user)) return
 
   if (!pendingApprovals.has('latest')) {
     await say('No pending content approval to skip.')
@@ -142,7 +146,7 @@ app.message(/^skip$/i, async ({ message, say }) => {
 // ── Route: title [n], ig [n] (content approval) ──────────────
 // Matches: "title 2, ig 1" / "title 1, ig 2, li" / "title 3 ig 1"
 app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, context }) => {
-  if (message.user !== ALLOWED_USER_ID) return
+  if (!ALLOWED_USERS.has(message.user)) return
 
   const titleIndex = parseInt(context.matches[1])
   const captionIndex = parseInt(context.matches[2])
@@ -189,7 +193,7 @@ app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, co
 // Updates the remote trigger prompt with the task + Slack coords, then fires it.
 // The CCR agent posts results back to this thread via Slack MCP.
 app.message(/^agent:\s*([\s\S]+)/i, async ({ message, say, context }) => {
-  if (message.user !== ALLOWED_USER_ID) return
+  if (!ALLOWED_USERS.has(message.user)) return
 
   const task = context.matches[1].trim()
   const threadTs = message.thread_ts || message.ts
@@ -281,7 +285,7 @@ The repo is byebyeadmin — a UK haulage AI automation business. All ops context
 // ── Fallback: route all other DMs through LLM cascade ────────
 // Tries providers in order: Gemini → Groq → OpenAI. Falls through on 429/rate-limit.
 app.message(async ({ message, say, client }) => {
-  if (message.user !== ALLOWED_USER_ID) return
+  if (!ALLOWED_USERS.has(message.user)) return
   if (!message.text || message.subtype) return
 
   const threadTs = message.thread_ts || message.ts
