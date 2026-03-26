@@ -31,7 +31,7 @@ const GMAIL_CLIENT_ID = "698251746508-3q6ah4t7hb56uit827gae055deb8f0rj.apps.goog
 const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
 const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN;
 const CLARITY_API_TOKEN = process.env.CLARITY_API_TOKEN;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const SLACK_USER_ID = process.env.SLACK_USER_ID || "U0AETR5UK4Y";
 
 // ── Date helpers ─────────────────────────────────────────────
@@ -191,28 +191,26 @@ async function getClarityTip() {
 
     const summary = JSON.stringify(data).slice(0, 1500);
 
-    if (!GROQ_API_KEY) return { ok: true, tip: null, raw: data };
+    if (!GEMINI_API_KEY) return { ok: true, tip: null };
 
-    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        max_tokens: 80,
-        messages: [
-          {
-            role: "user",
-            content: `Here is yesterday's Microsoft Clarity data for byebyeadmin.co.uk: ${summary}\n\nGive me ONE specific actionable UX improvement in 2 sentences max. Be direct. No preamble, no "Based on the data".`,
-          },
-        ],
-      }),
-    });
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Here is yesterday's Microsoft Clarity data for byebyeadmin.co.uk: ${summary}\n\nGive me ONE specific actionable UX improvement in 2 sentences max. Be direct. No preamble, no "Based on the data".`,
+            }],
+          }],
+          generationConfig: { maxOutputTokens: 100 },
+        }),
+      }
+    );
 
-    const groqData = await groqRes.json();
-    const tip = groqData.choices?.[0]?.message?.content?.trim() ?? null;
+    const geminiData = await geminiRes.json();
+    const tip = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? null;
     return { ok: true, tip };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -282,7 +280,10 @@ function formatBriefing(instantly, ga4, clarity, youtube) {
   if (clarity.ok && clarity.tip) {
     lines.push("*Site tip (Clarity)*");
     lines.push(clarity.tip);
-  } else if (!clarity.ok && !clarity.error?.includes("not set")) {
+  } else if (clarity.ok && !clarity.tip) {
+    lines.push("*Site tip (Clarity)*");
+    lines.push("Tip unavailable — Clarity data fetched but LLM generation failed.");
+  } else if (!clarity.ok && clarity.error && !clarity.error.includes("not set")) {
     lines.push(`Clarity: unavailable (${clarity.error})`);
   }
 
