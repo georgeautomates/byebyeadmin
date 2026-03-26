@@ -19,6 +19,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createWriteStream } from 'fs';
+import { execFileSync } from 'child_process';
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -99,7 +100,7 @@ async function listDriveFiles() {
   const query = encodeURIComponent(`'${DRIVE_FOLDER_ID}' in parents and trashed = false`);
   const res = await req({
     hostname: 'www.googleapis.com',
-    path: `/drive/v3/files?q=${query}&fields=files(id,name,mimeType,size,createdTime)&pageSize=50`,
+    path: `/drive/v3/files?q=${query}&fields=files(id,name,mimeType,size,createdTime)&pageSize=50&includeItemsFromAllDrives=true&supportsAllDrives=true`,
     headers: { Authorization: `Bearer ${token}` },
   });
   if (res.status !== 200) throw new Error(`Drive list failed (${res.status}): ${res.raw.slice(0, 200)}`);
@@ -140,7 +141,7 @@ async function downloadDriveFile(fileId, destPath) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'www.googleapis.com',
-      path: `/drive/v3/files/${fileId}?alt=media`,
+      path: `/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
       headers: { Authorization: `Bearer ${token}` },
     };
     const fileStream = createWriteStream(destPath);
@@ -162,33 +163,21 @@ async function downloadDriveFile(fileId, destPath) {
   });
 }
 
-// ── Whisper transcription ────────────────────────────────────
-async function transcribe(filePath) {
-  const fileData = fs.readFileSync(filePath);
-  const filename = path.basename(filePath);
-  const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
+// ── Whisper transcription (via curl to avoid OOM on large files) ─
+function transcribe(filePath) {
+  // Use curl to stream the file directly — avoids loading 300MB into JS heap
+  const result = execFileSync('curl', [
+    '-s',
+    'https://api.openai.com/v1/audio/transcriptions',
+    '-H', `Authorization: Bearer ${OPENAI_API_KEY}`,
+    '-F', `file=@${filePath}`,
+    '-F', 'model=whisper-1',
+    '-F', 'response_format=json',
+  ], { maxBuffer: 10 * 1024 * 1024, timeout: 600000 }); // 10 min timeout
 
-  const header = Buffer.from(
-    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: video/mp4\r\n\r\n`
-  );
-  const modelPart = Buffer.from(
-    `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n--${boundary}--\r\n`
-  );
-  const body = Buffer.concat([header, fileData, modelPart]);
-
-  const res = await req({
-    hostname: 'api.openai.com',
-    path: '/v1/audio/transcriptions',
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      'Content-Type': `multipart/form-data; boundary=${boundary}`,
-      'Content-Length': body.length,
-    },
-  }, body);
-
-  if (!res.body?.text) throw new Error(`Whisper failed (${res.status}): ${res.raw.slice(0, 300)}`);
-  return res.body.text;
+  const data = JSON.parse(result.toString());
+  if (!data.text) throw new Error(`Whisper failed: ${result.toString().slice(0, 300)}`);
+  return data.text;
 }
 
 // ── Fetch few-shot examples from Sheets ──────────────────────
@@ -383,7 +372,7 @@ async function main() {
   log('Sending Slack approval message...');
   await slackDM(msg);
 
-  // 10. Register with slack-listener
+  // 10. Register with slack-listener (include transcription for Sheets logging on approval)
   await registerApproval({
     token,
     filename: file.name,
