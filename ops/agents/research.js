@@ -6,7 +6,7 @@
 // Called by slack-listener.js when George DMs "last30 [topic]"
 // Can also be run directly from terminal for ad-hoc research
 
-import { execSync, spawnSync } from 'child_process'
+import { spawnSync } from 'child_process'
 import { readFileSync, existsSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -102,12 +102,18 @@ function formatBrief(topic, raw) {
   return header + cut + '\n\n_[Brief truncated — full report saved to ~/Documents/Last30Days/]_'
 }
 
-// ── Send via OpenClaw ────────────────────────────────────────
-function sendToSlack(message) {
-  execSync(
-    `openclaw message send --channel slack --target ${SLACK_USER_ID} --message ${JSON.stringify(message)}`,
-    { stdio: 'inherit' }
-  )
+// ── Send to Slack directly via bot token ─────────────────────
+async function sendToSlack(message) {
+  const res = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ channel: SLACK_USER_ID, text: message }),
+  })
+  const data = await res.json()
+  if (!data.ok) throw new Error(`Slack error: ${data.error}`)
 }
 
 // ── Main ─────────────────────────────────────────────────────
@@ -120,12 +126,12 @@ async function main() {
     console.log('\n--- Slack message ---')
     console.log(message)
     console.log('---\n')
-    sendToSlack(message)
+    await sendToSlack(message)
     console.log('Sent.')
   } catch (e) {
     const errMsg = `*Research failed for "${topic}"*\n\`${e.message}\``
     console.error('Research failed:', e.message)
-    sendToSlack(errMsg)
+    await sendToSlack(errMsg)
     process.exit(1)
   }
 }
