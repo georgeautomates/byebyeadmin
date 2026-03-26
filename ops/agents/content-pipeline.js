@@ -217,7 +217,7 @@ async function getFewShotExamples() {
   } catch { return ''; }
 }
 
-// ── Claude content generation ────────────────────────────────
+// ── Content generation (Gemini → OpenAI cascade, Anthropic rate-limited til Apr 1) ──
 async function generateContent(transcript, fewShot) {
   const systemPrompt = `You are a social media content writer for ByeByeAdmin, a UK haulage AI automation company. Write in George Spain-Warner's voice: confident, straight-talking, peer-to-peer. No buzzwords, no hype. Uses haulage industry terms naturally (TMS, PODs, tachograph, O-licence, FORS, driver checks). Short punchy sentences. Specific numbers over vague claims. No em dashes.`;
 
@@ -234,39 +234,64 @@ Generate:
 3. ONE LinkedIn post (2-4 short paragraphs, industry insight angle, ends with a specific question)
 4. ONE YouTube description (150-200 words, includes timestamps if relevant, 3-5 hashtags at end)
 
-Format your response as JSON:
-{
-  "titles": ["title1", "title2", "title3"],
-  "igCaptions": ["caption1", "caption2"],
-  "linkedinPost": "...",
-  "ytDescription": "..."
-}`;
+Respond with ONLY valid JSON, no markdown:
+{"titles":["...","...","..."],"igCaptions":["...","..."],"linkedinPost":"...","ytDescription":"..."}`;
 
-  const body = JSON.stringify({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 2000,
-    messages: [{ role: 'user', content: userPrompt }],
-    system: systemPrompt,
-  });
-
-  const res = await req({
-    hostname: 'api.anthropic.com',
-    path: '/v1/messages',
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(body),
+  const providers = [
+    process.env.GEMINI_API_KEY && {
+      name: 'gemini',
+      hostname: 'generativelanguage.googleapis.com',
+      path: `/v1beta/openai/chat/completions`,
+      authHeader: `Bearer ${process.env.GEMINI_API_KEY}`,
+      model: 'gemini-2.0-flash',
     },
-  }, body);
+    process.env.OPENAI_API_KEY && {
+      name: 'openai',
+      hostname: 'api.openai.com',
+      path: '/v1/chat/completions',
+      authHeader: `Bearer ${process.env.OPENAI_API_KEY}`,
+      model: 'gpt-4o-mini',
+    },
+  ].filter(Boolean);
 
-  if (res.status !== 200) throw new Error(`Claude failed (${res.status}): ${res.raw.slice(0, 300)}`);
+  for (const provider of providers) {
+    try {
+      log(`Trying ${provider.name} for content generation...`);
+      const body = JSON.stringify({
+        model: provider.model,
+        max_tokens: 2000,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      });
 
-  const text = res.body.content?.[0]?.text || '';
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error(`Claude returned no JSON: ${text.slice(0, 200)}`);
-  return JSON.parse(jsonMatch[0]);
+      const res = await req({
+        hostname: provider.hostname,
+        path: provider.path,
+        method: 'POST',
+        headers: {
+          Authorization: provider.authHeader,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      }, body);
+
+      if (res.status !== 200) {
+        log(`${provider.name} failed (${res.status}): ${res.raw.slice(0, 150)}`);
+        continue;
+      }
+
+      const text = res.body.choices?.[0]?.message?.content || '';
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error(`No JSON in response: ${text.slice(0, 200)}`);
+      return JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      log(`${provider.name} error: ${e.message}`);
+    }
+  }
+
+  throw new Error('All LLM providers failed for content generation');
 }
 
 // ── Calculate next schedule date (every other day, 1 week ahead) ─
