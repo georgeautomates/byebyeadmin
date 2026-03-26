@@ -164,16 +164,40 @@ async function downloadDriveFile(fileId, destPath) {
 }
 
 // ── Whisper transcription (via curl to avoid OOM on large files) ─
+// Whisper limit is 25MB — extract audio with ffmpeg first (mp3 at 64kbps keeps it small)
 function transcribe(filePath) {
-  // Use curl to stream the file directly — avoids loading 300MB into JS heap
+  const audioPath = filePath.replace(/\.[^.]+$/, '.mp3');
+
+  log('Extracting audio with ffmpeg...');
+  execFileSync('ffmpeg', [
+    '-i', filePath,
+    '-vn',           // no video
+    '-ar', '16000',  // 16kHz sample rate (Whisper optimised)
+    '-ac', '1',      // mono
+    '-ab', '64k',    // 64kbps — keeps a 10-min video well under 25MB
+    '-f', 'mp3',
+    '-y',            // overwrite
+    audioPath,
+  ], { timeout: 300000 });
+
+  const audioSize = fs.statSync(audioPath).size;
+  log(`Audio extracted: ${Math.round(audioSize / 1024 / 1024)}MB`);
+
+  if (audioSize > 24 * 1024 * 1024) {
+    throw new Error(`Audio file still too large for Whisper (${Math.round(audioSize / 1024 / 1024)}MB). Video may be very long.`);
+  }
+
+  log('Sending to Whisper...');
   const result = execFileSync('curl', [
     '-s',
     'https://api.openai.com/v1/audio/transcriptions',
     '-H', `Authorization: Bearer ${OPENAI_API_KEY}`,
-    '-F', `file=@${filePath}`,
+    '-F', `file=@${audioPath}`,
     '-F', 'model=whisper-1',
     '-F', 'response_format=json',
-  ], { maxBuffer: 10 * 1024 * 1024, timeout: 600000 }); // 10 min timeout
+  ], { maxBuffer: 10 * 1024 * 1024, timeout: 600000 });
+
+  try { fs.unlinkSync(audioPath); } catch {}
 
   const data = JSON.parse(result.toString());
   if (!data.text) throw new Error(`Whisper failed: ${result.toString().slice(0, 300)}`);
