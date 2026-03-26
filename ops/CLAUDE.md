@@ -62,7 +62,7 @@ skills/wrap-up.md               — category: meta           (run at session end
 Agent definitions and implementations in `agents/`:
 
 ```
-agents/morning-briefing.js   — LIVE cron: Instantly + YouTube → Slack (8am UTC Mon-Fri)
+agents/morning-briefing.js   — LIVE cron: Instantly + GA4 + Clarity tip + YouTube + IG + FB → Slack (8am UTC Mon-Fri)
 agents/morning-briefing.md   — spec
 agents/analytics-update.js   — LIVE cron: 7-day trends → Slack (8:30am UTC Mondays)
 agents/analytics-update.md   — spec
