@@ -31,7 +31,7 @@ const GMAIL_CLIENT_ID = "698251746508-3q6ah4t7hb56uit827gae055deb8f0rj.apps.goog
 const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
 const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN;
 const CLARITY_API_TOKEN = process.env.CLARITY_API_TOKEN;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const SLACK_USER_ID = process.env.SLACK_USER_ID || "U0AETR5UK4Y";
 
 // ── Date helpers ─────────────────────────────────────────────
@@ -191,26 +191,26 @@ async function getClarityTip() {
 
     const summary = JSON.stringify(data).slice(0, 1500);
 
-    if (!GEMINI_API_KEY) return { ok: true, tip: null };
+    if (!OPENAI_API_KEY) return { ok: true, tip: null };
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Here is yesterday's Microsoft Clarity data for byebyeadmin.co.uk: ${summary}\n\nGive me ONE specific actionable UX improvement in 2 sentences max. Be direct. No preamble, no "Based on the data".`,
-            }],
-          }],
-          generationConfig: { maxOutputTokens: 100 },
-        }),
-      }
-    );
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        max_tokens: 100,
+        messages: [{
+          role: "user",
+          content: `Here is yesterday's Microsoft Clarity data for byebyeadmin.co.uk: ${summary}\n\nGive me ONE specific actionable UX improvement in 2 sentences max. Be direct. No preamble, no "Based on the data".`,
+        }],
+      }),
+    });
 
-    const geminiData = await geminiRes.json();
-    const tip = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? null;
+    const openaiData = await openaiRes.json();
+    const tip = openaiData.choices?.[0]?.message?.content?.trim() ?? null;
     return { ok: true, tip };
   } catch (e) {
     return { ok: false, error: e.message };
