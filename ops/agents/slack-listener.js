@@ -59,6 +59,7 @@ const GOOGLE_REFRESH_TOKEN  = process.env.GOOGLE_DRIVE_REFRESH_TOKEN
 const CONTENT_SHEET_ID      = process.env.GOOGLE_CONTENT_SHEET_ID || '1Wx7J-m97iyXnK4_XxvtaAdnXW-FpB77hQI91mw4Lo7c'
 const YT_CHANNEL_ID         = '69b7df3d7be9f8b1715f313c'
 const IG_CHANNEL_ID         = '69b7de067be9f8b1715f2df4'
+const BUFFER_ORG_ID         = '69b7dc8e9ab93fdee82b1f6e'
 const RESEARCH_SCRIPT = resolve(__dir, 'research.js')
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const GROQ_API_KEY = process.env.GROQ_API_KEY
@@ -145,67 +146,49 @@ async function appendSheet(sheetId, tab, values) {
   if (res.status !== 200) throw new Error(`Sheets append failed (${res.status}): ${res.raw.slice(0, 200)}`)
 }
 
-async function bufferGraphQL(query, variables) {
-  const body = JSON.stringify({ query, variables })
+// Buffer posts require media — use Ideas instead (text-only, appears in Buffer Ideas tab)
+// Called via MCP relay which handles auth internally
+async function bufferCreateIdea(title, igCaption, ytDescription) {
+  const text = [
+    `*IG caption:*\n${igCaption}`,
+    ytDescription ? `*YT description:*\n${ytDescription}` : '',
+  ].filter(Boolean).join('\n\n')
+
+  const body = JSON.stringify({
+    jsonrpc: '2.0',
+    id: '1',
+    method: 'tools/call',
+    params: {
+      name: 'create_idea',
+      arguments: {
+        organizationId: BUFFER_ORG_ID,
+        content: { title, text, services: ['youtube', 'instagram'] },
+      },
+    },
+  })
+
   const res = await httpreq({
-    hostname: 'api.buffer.com',
-    path: '/graphql',
+    hostname: 'mcp.buffer.com',
+    path: '/mcp',
     method: 'POST',
     headers: {
       Authorization: `Bearer ${BUFFER_TOKEN}`,
       'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
       'Content-Length': Buffer.byteLength(body),
     },
   }, body)
-  if (res.status !== 200) throw new Error(`Buffer GraphQL HTTP ${res.status}: ${res.raw.slice(0, 300)}`)
-  if (res.body?.errors) throw new Error(`Buffer GraphQL error: ${JSON.stringify(res.body.errors).slice(0, 300)}`)
-  return res.body?.data
-}
 
-const CREATE_POST_MUTATION = `
-  mutation CreatePost($input: CreatePostInput!) {
-    createPost(input: $input) {
-      ... on PostActionSuccess { post { id status } }
-      ... on UnexpectedError { message }
-      ... on InvalidInputError { message }
-      ... on RestProxyError { message }
-      ... on LimitReachedError { message }
-    }
-  }
-`
+  if (res.status !== 200) throw new Error(`Buffer MCP HTTP ${res.status}: ${res.raw.slice(0, 200)}`)
 
-async function bufferCreateYouTubeDraft(title, description, scheduledAt) {
-  const data = await bufferGraphQL(CREATE_POST_MUTATION, {
-    input: {
-      channelId: YT_CHANNEL_ID,
-      text: description,
-      schedulingType: 'notification',
-      mode: 'customScheduled',
-      dueAt: scheduledAt,
-      saveToDraft: true,
-      metadata: { youtube: { title, categoryId: '22' } },
-    },
-  })
-  const result = data?.createPost
-  if (result?.message) throw new Error(`YouTube draft failed: ${result.message}`)
-  return result?.post
-}
-
-async function bufferCreateInstagramDraft(caption, scheduledAt) {
-  const data = await bufferGraphQL(CREATE_POST_MUTATION, {
-    input: {
-      channelId: IG_CHANNEL_ID,
-      text: caption,
-      schedulingType: 'notification',
-      mode: 'customScheduled',
-      dueAt: scheduledAt,
-      saveToDraft: true,
-      metadata: { instagram: { type: 'post', shouldShareToFeed: true } },
-    },
-  })
-  const result = data?.createPost
-  if (result?.message) throw new Error(`Instagram draft failed: ${result.message}`)
-  return result?.post
+  // SSE response: extract data line
+  const dataLine = (res.raw || '').split('\n').find(l => l.startsWith('data:'))
+  if (!dataLine) throw new Error(`Buffer MCP no data in response: ${res.raw.slice(0, 200)}`)
+  const parsed = JSON.parse(dataLine.slice(5).trim())
+  if (parsed.result?.isError) throw new Error(`Buffer idea failed: ${parsed.result.content?.[0]?.text}`)
+  const ideaText = parsed.result?.content?.[0]?.text
+  const idea = ideaText ? JSON.parse(ideaText) : null
+  return idea
 }
 
 // ── Pending content approvals ────────────────────────────────
@@ -296,13 +279,9 @@ app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, co
     if (!title)     throw new Error(`Title ${titleIndex} not found in options`)
     if (!igCaption) throw new Error(`IG caption ${captionIndex} not found in options`)
 
-    // Post to Buffer: YouTube (title + description) and Instagram (caption)
-    const [ytResult, igResult] = await Promise.all([
-      bufferCreateYouTubeDraft(title, ytDesc, scheduleDate),
-      bufferCreateInstagramDraft(igCaption, scheduleDate),
-    ])
-    console.log(`[content] Buffer YT draft: ${ytResult?.id || 'ok'}`)
-    console.log(`[content] Buffer IG draft: ${igResult?.id || 'ok'}`)
+    // Create Buffer idea (text-only; Buffer requires media for posts — George adds video in Buffer)
+    const idea = await bufferCreateIdea(title, igCaption, ytDesc)
+    console.log(`[content] Buffer idea created: ${idea?.id || 'ok'}`)
 
     const scheduleDateStr = new Date(scheduleDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 
@@ -322,10 +301,11 @@ app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, co
     console.log('[content] Scheduled to Buffer and logged to Sheets')
 
     await say(
-      `Scheduled for *${scheduleDateStr}*\n` +
-      `*YT:* ${title}\n` +
-      `*IG:* ${igCaption.slice(0, 80)}...` +
-      (liPost ? `\n*LinkedIn:* ${liPost.slice(0, 80)}...` : '')
+      `Idea saved to Buffer for *${scheduleDateStr}*\n` +
+      `*YT title:* ${title}\n` +
+      `*IG caption:* ${igCaption.slice(0, 80)}...` +
+      (liPost ? `\n*LinkedIn:* ${liPost.slice(0, 80)}...` : '') +
+      `\n\nGo to Buffer → Ideas to find it. Add the video and publish.`
     )
   } catch (err) {
     console.error('[content] Failed to schedule:', err.message)
