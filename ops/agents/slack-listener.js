@@ -148,7 +148,7 @@ async function appendSheet(sheetId, tab, values) {
 async function bufferGraphQL(query, variables) {
   const body = JSON.stringify({ query, variables })
   const res = await httpreq({
-    hostname: 'publish.buffer.com',
+    hostname: 'api.buffer.com',
     path: '/graphql',
     method: 'POST',
     headers: {
