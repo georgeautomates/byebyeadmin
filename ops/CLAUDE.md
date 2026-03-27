@@ -6,7 +6,7 @@ George's AI operating system for running ByeByeAdmin. Lives in `ops/` inside the
 
 **Two environments:**
 - **MacBook (Claude Code in VS Code)** — active build work, deliberate tasks
-- **Hetzner VPS (OpenClaw)** — ambient 24/7 agent, morning briefings, monitoring
+- **Hetzner VPS** — runs the Slack router (Socket Mode listener) and cron jobs that fire Claude Code remote triggers. All AI logic runs in Anthropic's cloud via remote triggers — the VPS just routes and schedules.
 
 ## Projects
 
@@ -57,31 +57,44 @@ skills/transcription.md         — category: ops
 skills/wrap-up.md               — category: meta           (run at session end)
 ```
 
-## Agents directory
+## Agent architecture (Claude Code remote triggers)
 
-Agent definitions and implementations in `agents/`:
+All AI logic runs as Claude Code remote triggers on Anthropic's cloud — no ANTHROPIC_API_KEY needed, runs on George's Claude Max subscription. The VPS runs only the Slack router and fires triggers via cron.
+
+### Remote triggers (configured on claude.ai)
+
+| Trigger | Purpose | Fired by |
+|---------|---------|---------|
+| `bba-briefings` | Morning briefing, weekly analytics, content inventory | VPS crontab (curl) |
+| `bba-content` | Content pipeline: Drive → Whisper → copy gen → Buffer | VPS crontab + Slack router |
+| `bba-research` | On-demand last30days research | Slack router (`last30 [topic]`) |
+| `bba-chat` | Ad-hoc DM chat (replaces LLM cascade) | Slack router (fallback) |
+
+Trigger prompt files are in `triggers/` — copy into claude.ai Remote Trigger instructions field.
+
+### VPS files
 
 ```
-agents/morning-briefing.js   — LIVE cron: Instantly + GA4 + Clarity tip + YouTube + IG + FB → Slack (8am UTC Mon-Fri)
-agents/morning-briefing.md   — spec
-agents/analytics-update.js   — LIVE cron: 7-day trends → Slack (8:30am UTC Mondays)
-agents/analytics-update.md   — spec
-agents/research.js           — LIVE on-demand: last30days research → Slack (triggered by slack-listener)
-agents/research.md           — spec
-agents/slack-listener.js     — LIVE service: Socket Mode inbound handler, routes "last30 [topic]" DMs
-agents/slack-listener.md     — spec (includes VPS setup + systemd service config)
-agents/lib/context-loader.js — shared utility: loads skills/brand-context/learnings for VPS agents
-agents/prospector.md         — spec only (implement: apollo → CSV → Slack)
-agents/transcription.md      — spec only (implement: voice → Whisper → structured output)
-agents/memory.md             — spec only (manual via memory-agent skill)
+agents/slack-router.js   — LIVE service: ~75-line Socket Mode router, fires remote triggers
+agents/archive/          — old agent implementations kept for reference
+agents/prospector.md     — spec only (implement: apollo → CSV → Slack)
+agents/transcription.md  — spec only (implement: voice → Whisper → structured output)
 ```
 
-**VPS agents that produce written output** must use `agents/lib/context-loader.js`:
-```js
-import { buildSystemPrompt } from './lib/context-loader.js'
-const system = buildSystemPrompt(['skill-name'], ['voice', 'icp'])
-// pass `system` as the system prompt in your Anthropic API call
+### VPS crontab (4 entries firing remote triggers)
+
 ```
+0 8 * * 1-5   — MORNING BRIEFING  → bba-briefings trigger
+30 8 * * 1    — WEEKLY ANALYTICS  → bba-briefings trigger
+0 9,17 * * *  — PIPELINE CHECK    → bba-content trigger
+0 6 * * *     — CONTENT INVENTORY → bba-briefings trigger
+```
+
+### Content pipeline approval state
+
+Pending approvals are stored in Google Sheets tab "Pending Approvals" in sheet `1Wx7J-m97iyXnK4_XxvtaAdnXW-FpB77hQI91mw4Lo7c`.
+Columns: run_id | filename | drive_file_id | schedule_date | title_1 | title_2 | title_3 | ig_1 | ig_2 | linkedin | yt_description | transcript | status
+Status values: awaiting → processed | skipped
 
 ## API tools wired in (OpenClaw VPS + Claude Code)
 
