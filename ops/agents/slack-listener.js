@@ -145,23 +145,67 @@ async function appendSheet(sheetId, tab, values) {
   if (res.status !== 200) throw new Error(`Sheets append failed (${res.status}): ${res.raw.slice(0, 200)}`)
 }
 
-async function bufferCreatePost(channelId, text, scheduledAt) {
-  const body = new URLSearchParams({
-    profile_ids: channelId,
-    text,
-    scheduled_at: scheduledAt,
-    access_token: BUFFER_TOKEN,
-    now: 'false',
-    top: 'false',
-  }).toString()
+async function bufferGraphQL(query, variables) {
+  const body = JSON.stringify({ query, variables })
   const res = await httpreq({
-    hostname: 'api.bufferapp.com',
-    path: '/1/updates/create.json',
+    hostname: 'publish.buffer.com',
+    path: '/graphql',
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
+    headers: {
+      Authorization: `Bearer ${BUFFER_TOKEN}`,
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+    },
   }, body)
-  if (res.status !== 200 || !res.body?.success) throw new Error(`Buffer post failed (${res.status}): ${res.raw.slice(0, 200)}`)
-  return res.body
+  if (res.status !== 200) throw new Error(`Buffer GraphQL HTTP ${res.status}: ${res.raw.slice(0, 300)}`)
+  if (res.body?.errors) throw new Error(`Buffer GraphQL error: ${JSON.stringify(res.body.errors).slice(0, 300)}`)
+  return res.body?.data
+}
+
+const CREATE_POST_MUTATION = `
+  mutation CreatePost($input: CreatePostInput!) {
+    createPost(input: $input) {
+      ... on PostActionSuccess { post { id status } }
+      ... on UnexpectedError { message }
+      ... on InvalidInputError { message }
+      ... on RestProxyError { message }
+      ... on LimitReachedError { message }
+    }
+  }
+`
+
+async function bufferCreateYouTubeDraft(title, description, scheduledAt) {
+  const data = await bufferGraphQL(CREATE_POST_MUTATION, {
+    input: {
+      channelId: YT_CHANNEL_ID,
+      text: description,
+      schedulingType: 'notification',
+      mode: 'customScheduled',
+      dueAt: scheduledAt,
+      saveToDraft: true,
+      metadata: { youtube: { title, categoryId: '22' } },
+    },
+  })
+  const result = data?.createPost
+  if (result?.message) throw new Error(`YouTube draft failed: ${result.message}`)
+  return result?.post
+}
+
+async function bufferCreateInstagramDraft(caption, scheduledAt) {
+  const data = await bufferGraphQL(CREATE_POST_MUTATION, {
+    input: {
+      channelId: IG_CHANNEL_ID,
+      text: caption,
+      schedulingType: 'notification',
+      mode: 'customScheduled',
+      dueAt: scheduledAt,
+      saveToDraft: true,
+      metadata: { instagram: { type: 'post', shouldShareToFeed: true } },
+    },
+  })
+  const result = data?.createPost
+  if (result?.message) throw new Error(`Instagram draft failed: ${result.message}`)
+  return result?.post
 }
 
 // ── Pending content approvals ────────────────────────────────
@@ -254,11 +298,11 @@ app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, co
 
     // Post to Buffer: YouTube (title + description) and Instagram (caption)
     const [ytResult, igResult] = await Promise.all([
-      bufferCreatePost(YT_CHANNEL_ID, `${title}\n\n${ytDesc}`, scheduleDate),
-      bufferCreatePost(IG_CHANNEL_ID, igCaption, scheduleDate),
+      bufferCreateYouTubeDraft(title, ytDesc, scheduleDate),
+      bufferCreateInstagramDraft(igCaption, scheduleDate),
     ])
-    console.log(`[content] Buffer YT draft: ${ytResult?.updates?.[0]?.id || 'ok'}`)
-    console.log(`[content] Buffer IG draft: ${igResult?.updates?.[0]?.id || 'ok'}`)
+    console.log(`[content] Buffer YT draft: ${ytResult?.id || 'ok'}`)
+    console.log(`[content] Buffer IG draft: ${igResult?.id || 'ok'}`)
 
     const scheduleDateStr = new Date(scheduleDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 

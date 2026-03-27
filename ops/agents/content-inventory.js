@@ -30,7 +30,8 @@ const BUFFER_TOKEN  = process.env.BUFFER_TOKEN;
 const SLACK_TOKEN   = process.env.SLACK_BOT_TOKEN;
 const SLACK_USER_ID = process.env.SLACK_USER_ID || 'U0AETR5UK4Y';
 
-// YouTube and Instagram channel IDs
+// Buffer organization + channel IDs
+const ORG_ID    = '69b7dc8e9ab93fdee82b1f6e';
 const CHANNEL_IDS = [
   '69b7df3d7be9f8b1715f313c', // YouTube
   '69b7de067be9f8b1715f2df4', // Instagram
@@ -43,7 +44,7 @@ function httpreq(options, body) {
       res.on('data', c => chunks.push(c));
       res.on('end', () => {
         const raw = Buffer.concat(chunks).toString();
-        try { resolve({ status: res.statusCode, body: JSON.parse(raw) }); }
+        try { resolve({ status: res.statusCode, body: JSON.parse(raw), raw }); }
         catch { resolve({ status: res.statusCode, body: null, raw }); }
       });
     });
@@ -53,13 +54,46 @@ function httpreq(options, body) {
   });
 }
 
-async function getBufferQueue(channelId) {
+async function getScheduledPosts() {
+  const now = new Date();
+  const sevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const query = `
+    query GetPosts($input: PostsInput!) {
+      posts(input: $input, first: 100) {
+        edges { node { id dueAt } }
+      }
+    }
+  `;
+  const variables = {
+    input: {
+      organizationId: ORG_ID,
+      filter: {
+        channelIds: CHANNEL_IDS,
+        status: ['scheduled'],
+        dueAt: { start: now.toISOString(), end: sevenDays.toISOString() },
+      },
+    },
+  };
+  const body = JSON.stringify({ query, variables });
   const res = await httpreq({
-    hostname: 'api.bufferapp.com',
-    path: `/1/profiles/${channelId}/updates/pending.json?count=100&access_token=${BUFFER_TOKEN}`,
-  });
-  if (res.status !== 200) return [];
-  return res.body?.updates || [];
+    hostname: 'publish.buffer.com',
+    path: '/graphql',
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${BUFFER_TOKEN}`,
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+    },
+  }, body);
+  if (res.status !== 200) {
+    console.error(`[inventory] Buffer GraphQL HTTP ${res.status}: ${(res.raw || '').slice(0, 200)}`);
+    return [];
+  }
+  if (res.body?.errors) {
+    console.error(`[inventory] Buffer GraphQL errors: ${JSON.stringify(res.body.errors).slice(0, 200)}`);
+    return [];
+  }
+  return res.body?.data?.posts?.edges?.map(e => e.node) || [];
 }
 
 async function slackDM(text) {
@@ -77,24 +111,16 @@ async function slackDM(text) {
 }
 
 async function main() {
-  const now = Date.now();
-  const sevenDays = now + 7 * 24 * 60 * 60 * 1000;
-
   // Count unique dates covered in the next 7 days across all channels
   const coveredDates = new Set();
 
-  for (const channelId of CHANNEL_IDS) {
-    try {
-      const updates = await getBufferQueue(channelId);
-      for (const u of updates) {
-        const due = (u.due_at || u.scheduled_at) * 1000;
-        if (due >= now && due <= sevenDays) {
-          coveredDates.add(new Date(due).toISOString().slice(0, 10));
-        }
-      }
-    } catch (e) {
-      console.error(`[inventory] Failed to get Buffer queue for ${channelId}:`, e.message);
+  try {
+    const posts = await getScheduledPosts();
+    for (const p of posts) {
+      if (p.dueAt) coveredDates.add(p.dueAt.slice(0, 10));
     }
+  } catch (e) {
+    console.error('[inventory] Failed to get Buffer scheduled posts:', e.message);
   }
 
   console.log(`[inventory] Covered dates in next 7 days: ${coveredDates.size}`);
