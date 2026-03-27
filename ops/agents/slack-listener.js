@@ -167,23 +167,39 @@ async function bufferCreateIdea(title, igCaption, ytDescription) {
     },
   })
 
-  const res = await httpreq({
-    hostname: 'mcp.buffer.com',
-    path: '/mcp',
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${BUFFER_TOKEN}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
-      'Content-Length': Buffer.byteLength(body),
-    },
-  }, body)
+  // MCP returns SSE (text/event-stream) which never closes — read until first data line then destroy
+  const raw = await new Promise((resolve, reject) => {
+    const r = https.request({
+      hostname: 'mcp.buffer.com',
+      path: '/mcp',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${BUFFER_TOKEN}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let buf = ''
+      res.on('data', (chunk) => {
+        buf += chunk.toString()
+        if (buf.includes('\ndata:') || buf.startsWith('data:')) {
+          res.destroy()
+          resolve({ status: res.statusCode, raw: buf })
+        }
+      })
+      res.on('end', () => resolve({ status: res.statusCode, raw: buf }))
+      res.on('error', (e) => { if (e.code !== 'ECONNRESET') reject(e) })
+    })
+    r.on('error', reject)
+    r.write(body)
+    r.end()
+  })
 
-  if (res.status !== 200) throw new Error(`Buffer MCP HTTP ${res.status}: ${res.raw.slice(0, 200)}`)
+  if (raw.status !== 200) throw new Error(`Buffer MCP HTTP ${raw.status}: ${raw.raw?.slice(0, 200)}`)
 
-  // SSE response: extract data line
-  const dataLine = (res.raw || '').split('\n').find(l => l.startsWith('data:'))
-  if (!dataLine) throw new Error(`Buffer MCP no data in response: ${res.raw.slice(0, 200)}`)
+  const dataLine = (raw.raw || '').split('\n').find(l => l.startsWith('data:'))
+  if (!dataLine) throw new Error(`Buffer MCP no data in response: ${raw.raw?.slice(0, 200)}`)
   const parsed = JSON.parse(dataLine.slice(5).trim())
   if (parsed.result?.isError) throw new Error(`Buffer idea failed: ${parsed.result.content?.[0]?.text}`)
   const ideaText = parsed.result?.content?.[0]?.text
