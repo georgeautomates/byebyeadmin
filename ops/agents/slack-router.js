@@ -4,7 +4,8 @@
  * Zero business logic — all intelligence runs in Anthropic's cloud.
  */
 
-const { App } = require('@slack/bolt');
+import pkg from '@slack/bolt';
+const { App } = pkg;
 
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
