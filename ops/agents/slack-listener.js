@@ -41,7 +41,11 @@ function loadEnv() {
 loadEnv()
 
 // Prevent stray WebSocket/network errors from crashing the process
-process.on('uncaughtException', (err) => console.error('[fatal] Uncaught exception:', err.message))
+// Exit on EADDRINUSE so systemd restarts cleanly instead of accumulating zombie instances
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] Uncaught exception:', err.message)
+  if (err.code === 'EADDRINUSE') process.exit(1)
+})
 process.on('unhandledRejection', (reason) => console.error('[fatal] Unhandled rejection:', reason))
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN
