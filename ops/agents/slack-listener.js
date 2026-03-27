@@ -500,7 +500,7 @@ createServer((req, res) => {
   req.on('end', () => {
     try {
       const data = JSON.parse(body)
-      if (!data.resumeUrl || !data.token) {
+      if (!data.token) {
         res.writeHead(400)
         res.end('Missing resumeUrl or token')
         return
