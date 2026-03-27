@@ -187,10 +187,13 @@ async function bufferCreateIdea(title, igCaption, ytDescription) {
       let buf = ''
       res.on('data', (chunk) => {
         buf += chunk.toString()
-        if (buf.includes('\ndata:') || buf.startsWith('data:')) {
-          res.destroy()
-          resolve({ status: res.statusCode, raw: buf })
-        }
+        // Wait for a complete data line (terminated by \n) before destroying
+        const lineStart = buf.startsWith('data:') ? 0 : buf.indexOf('\ndata:') + 1
+        if (lineStart < 0) return
+        const lineEnd = buf.indexOf('\n', lineStart + 5)
+        if (lineEnd === -1) return // incomplete line, wait for more
+        res.destroy()
+        resolve({ status: res.statusCode, raw: buf })
       })
       res.on('end', () => resolve({ status: res.statusCode, raw: buf }))
       res.on('error', (e) => { if (e.code !== 'ECONNRESET') reject(e) })
