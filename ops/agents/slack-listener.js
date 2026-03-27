@@ -308,17 +308,19 @@ app.message(/^title\s+(\d)[,\s]+ig\s+(\d)(,?\s*li)?/i, async ({ message, say, co
 
     const scheduleDateStr = new Date(scheduleDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 
-    // Log to Raw Transcripts sheet
+    // Log to Raw Transcripts sheet (non-fatal — Sheets 403 shouldn't block confirmation)
     const now = new Date().toISOString().slice(0, 10)
-    await appendSheet(CONTENT_SHEET_ID, 'Raw Transcripts', [[
-      now, filename, transcript || '',
-      options.titles.join(' | '), options.igCaptions.join(' | '),
-      options.linkedinPost || '', ytDesc,
-      title, igCaption, liPost || '',
-    ]])
-
-    // Mark as processed
-    await appendSheet(CONTENT_SHEET_ID, 'Processed Videos', [[driveFileId, filename, now]])
+    try {
+      await appendSheet(CONTENT_SHEET_ID, 'Raw Transcripts', [[
+        now, filename, transcript || '',
+        options.titles.join(' | '), options.igCaptions.join(' | '),
+        options.linkedinPost || '', ytDesc,
+        title, igCaption, liPost || '',
+      ]])
+      await appendSheet(CONTENT_SHEET_ID, 'Processed Videos', [[driveFileId, filename, now]])
+    } catch (sheetErr) {
+      console.warn('[content] Sheets logging failed (non-fatal):', sheetErr.message)
+    }
 
     pendingApprovals.delete('latest')
     console.log('[content] Scheduled to Buffer and logged to Sheets')
