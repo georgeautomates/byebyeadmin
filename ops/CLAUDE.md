@@ -63,12 +63,13 @@ All AI logic runs as Claude Code remote triggers on Anthropic's cloud — no ANT
 
 ### Remote triggers (configured on claude.ai)
 
-| Trigger | Purpose | Fired by |
-|---------|---------|---------|
-| `bba-briefings` | Morning briefing, weekly analytics, content inventory | VPS crontab (curl) |
-| `bba-content` | Content pipeline: Drive → Whisper → copy gen → Buffer | VPS crontab + Slack router |
-| `bba-research` | On-demand last30days research | Slack router (`last30 [topic]`) |
-| `bba-chat` | Ad-hoc DM chat (replaces LLM cascade) | Slack router (fallback) |
+| Trigger | ID | Purpose | Fired by |
+|---------|-----|---------|---------|
+| `bba-briefings` | `trig_01Urea4LcozDYEr9RwUXhJe9` | Morning briefing, weekly analytics, content inventory | VPS crontab |
+| `bba-content` | `trig_019Avfkx4idVxQkv6MBwhY1N` | Content pipeline: Drive → Whisper → copy gen → Buffer | VPS crontab + Slack router |
+| `bba-research` | `trig_01Bi9uBKy3KoyojZb54ZqFqx` | On-demand last30days research | Slack router (`last30 [topic]`) |
+| `bba-chat` | `trig_01FXCQ6ByRHo8dKVWnA7aQRG` | Ad-hoc DM chat + agent tasks | Slack router (fallback + `agent:`) |
+| `bba-website-review` | `trig_01UVD2pCx7cC7tHUWb69CSiB` | Weekly GA4 + Clarity website report | VPS crontab (Sunday 8am UTC) |
 
 Trigger prompt files are in `triggers/` — copy into claude.ai Remote Trigger instructions field.
 
@@ -81,13 +82,14 @@ agents/prospector.md     — spec only (implement: apollo → CSV → Slack)
 agents/transcription.md  — spec only (implement: voice → Whisper → structured output)
 ```
 
-### VPS crontab (4 entries firing remote triggers)
+### VPS crontab (5 entries firing remote triggers)
 
 ```
-0 8 * * 1-5   — MORNING BRIEFING  → bba-briefings trigger
-30 8 * * 1    — WEEKLY ANALYTICS  → bba-briefings trigger
-0 9,17 * * *  — PIPELINE CHECK    → bba-content trigger
-0 6 * * *     — CONTENT INVENTORY → bba-briefings trigger
+0 8 * * 1-5   — MORNING BRIEFING    → bba-briefings trigger
+30 8 * * 1    — WEEKLY ANALYTICS    → bba-briefings trigger
+0 9,17 * * *  — PIPELINE CHECK      → bba-content trigger
+0 6 * * *     — CONTENT INVENTORY   → bba-briefings trigger
+0 8 * * 0     — WEEKLY WEBSITE REVIEW → bba-website-review trigger
 ```
 
 ### Content pipeline approval state
