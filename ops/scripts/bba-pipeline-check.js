@@ -137,13 +137,25 @@ async function callLlm(prompt, maxTokens = 1500) {
 
   // Fall back to Gemini
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) return '';
-  const gr = await postJson(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } },
-    {}
+  if (geminiKey) {
+    const gr = await postJson(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+      { contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } },
+      {}
+    );
+    const gtext = gr?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (gtext) return gtext;
+    console.error('Gemini failed — trying OpenAI');
+  }
+  // Fall back to OpenAI
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return '';
+  const or = await postJson(
+    'https://api.openai.com/v1/chat/completions',
+    { model: 'gpt-4o-mini', max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] },
+    { Authorization: `Bearer ${openaiKey}` }
   );
-  return gr?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return or?.choices?.[0]?.message?.content || '';
 }
 
 // ── Sheets helpers ────────────────────────────────────────────────────────────
