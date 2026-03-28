@@ -278,7 +278,7 @@ Rules:
 Format:
 :bar_chart: *BBA Weekly Analytics — w/e {today}*
 
-:email: Outreach (7d) — [sent] sent · [open_rate]% open · [reply_rate]% reply (null = unavailable)
+:email: Outreach (7d) — [sent] sent · [open_rate]% open · [reply_rate]% reply
 :globe_with_meridians: Site (7d) — X sessions ([+/-]% wow) · {assess_7d} /assessment views
 :iphone: YouTube — {current_subs} subs ({delta_str} this week)
 :dart: Assessment completions (7d): X (use eventCount from this_week row of ga4_assessment_wow)
