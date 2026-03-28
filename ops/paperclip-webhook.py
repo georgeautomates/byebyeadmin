@@ -8,7 +8,7 @@ Port: 8765 (internal only — not exposed externally)
 Secret: PAPERCLIP_WEBHOOK_SECRET env var (set in VPS .env)
 """
 
-import os, json, subprocess, time, sys, logging
+import os, json, subprocess, time, sys, logging, urllib.request
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # ── env ───────────────────────────────────────────────────────────────────────
@@ -29,8 +29,53 @@ load_env()
 WEBHOOK_SECRET = os.environ.get('PAPERCLIP_WEBHOOK_SECRET', '')
 PAPERCLIP_URL  = os.environ.get('PAPERCLIP_API_URL', 'http://localhost:3100')
 PAPERCLIP_KEY  = os.environ.get('PAPERCLIP_API_KEY', '')
+COMPANY_ID     = os.environ.get('PAPERCLIP_COMPANY_ID', '')
 NODE           = '/home/openclaw/.nvm/versions/node/v22.22.1/bin/node'
 SCRIPTS        = '/home/openclaw/byebyeadmin/ops/scripts'
+
+# Agent IDs — used to create Paperclip issues per run
+AGENT_IDS = {
+    'morning-brief':    '718f13c4-06a8-45cb-927c-b5222eaff473',
+    'weekly-analytics': 'e919e9fa-7ce7-4a03-8413-f1ff2b0ec6ee',
+    'pipeline-check':   'c3efa1b1-8abc-49e9-b06c-f28a9d3110d4',
+    'content-inventory':'afd1fb9c-721d-45b1-b2a2-67a2e965dc84',
+    'website-review':   '42a0c3ff-e4fd-41ab-b40e-532cba86e0e5',
+}
+
+def paperclip_post(path, data):
+    """POST to Paperclip API. Fire-and-forget — never blocks execution."""
+    if not COMPANY_ID:
+        return None
+    try:
+        body = json.dumps(data).encode()
+        req  = urllib.request.Request(
+            f'{PAPERCLIP_URL}/api{path}',
+            data=body,
+            headers={'Content-Type': 'application/json'},
+        )
+        resp = urllib.request.urlopen(req, timeout=5)
+        return json.loads(resp.read())
+    except Exception as e:
+        log.warning('Paperclip API call failed: %s', e)
+        return None
+
+def paperclip_patch(path, data):
+    """PATCH to Paperclip API."""
+    if not COMPANY_ID:
+        return None
+    try:
+        body = json.dumps(data).encode()
+        req  = urllib.request.Request(
+            f'{PAPERCLIP_URL}/api{path}',
+            data=body,
+            method='PATCH',
+            headers={'Content-Type': 'application/json'},
+        )
+        resp = urllib.request.urlopen(req, timeout=5)
+        return json.loads(resp.read())
+    except Exception as e:
+        log.warning('Paperclip PATCH failed: %s', e)
+        return None
 
 logging.basicConfig(
     level=logging.INFO,
@@ -93,6 +138,20 @@ class WebhookHandler(BaseHTTPRequestHandler):
         log.info('Running agent=%s run_id=%s', agent_name, run_id)
         start = time.time()
 
+        # Open a Paperclip issue to track this run
+        issue_id = None
+        agent_id = AGENT_IDS.get(agent_name)
+        if agent_id and COMPANY_ID:
+            issue = paperclip_post(f'/companies/{COMPANY_ID}/issues', {
+                'title':          f'Run: {agent_name}',
+                'assigneeAgentId': agent_id,
+                'priority':        'medium',
+                'status':          'in_progress',
+            })
+            if issue:
+                issue_id = issue.get('id')
+                log.info('Paperclip issue %s created for %s', issue_id, agent_name)
+
         env = {**os.environ, 'PAPERCLIP_RUN_ID': run_id, 'PAPERCLIP_API_URL': PAPERCLIP_URL}
 
         try:
@@ -111,8 +170,13 @@ class WebhookHandler(BaseHTTPRequestHandler):
             if stderr:
                 log.warning('Agent=%s stderr: %s', agent_name, stderr[:500])
 
-            # Token counts are reported by scripts separately via PATCH /api/runs/
-            # Here we return a summary so Paperclip records the execution.
+            # Close the Paperclip issue with result
+            if issue_id:
+                paperclip_patch(f'/issues/{issue_id}', {
+                    'status':      'done' if ok else 'cancelled',
+                    'description': f'Elapsed: {elapsed}s\n\n{stdout[-1500:]}' + (f'\n\nErrors:\n{stderr[-500:]}' if stderr else ''),
+                })
+
             self.send_json(200, {
                 'status':  'succeeded' if ok else 'failed',
                 'result':  stdout[-2000:] if stdout else '',
@@ -122,12 +186,19 @@ class WebhookHandler(BaseHTTPRequestHandler):
             })
 
         except subprocess.TimeoutExpired:
+            if issue_id:
+                paperclip_patch(f'/issues/{issue_id}', {
+                    'status': 'cancelled',
+                    'description': f'Timed out after 300s',
+                })
             self.send_json(200, {
                 'status': 'failed',
                 'error':  f'Agent {agent_name} timed out after 300s',
                 'usage':  {'inputTokens': 0, 'outputTokens': 0, 'totalTokens': 0},
             })
         except Exception as e:
+            if issue_id:
+                paperclip_patch(f'/issues/{issue_id}', {'status': 'cancelled', 'description': str(e)})
             log.exception('Agent=%s unexpected error', agent_name)
             self.send_json(500, {'status': 'failed', 'error': str(e)})
 
