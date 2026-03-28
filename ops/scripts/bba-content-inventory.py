@@ -3,8 +3,8 @@
 Checks Buffer YouTube queue. Alerts George if fewer than 3 posts in next 7 days.
 """
 
-import os, json, sys
-import urllib.request, urllib.parse
+import os, json, sys, datetime
+import urllib.request
 
 def load_env():
     path = '/home/openclaw/byebyeadmin/ops/.env'
@@ -19,84 +19,75 @@ def load_env():
 
 load_env()
 
-GEORGE       = 'U0AETR5UK4Y'
-SLACK_TOKEN  = os.environ['SLACK_BOT_TOKEN']
-BUFFER_TOKEN = os.environ['BUFFER_TOKEN']
+GEORGE        = 'U0AETR5UK4Y'
+SLACK_TOKEN   = os.environ['SLACK_BOT_TOKEN']
+BUFFER_TOKEN  = os.environ['BUFFER_TOKEN']
+BUFFER_ORG_ID = '69b7dc8e9ab93fdee82b1f6e'
+BUFFER_YT_ID  = '69b7df3d7be9f8b1715f313c'
 
-def get(url, headers=None):
+def graphql(query, variables=None):
     try:
-        req = urllib.request.Request(url, headers=headers or {})
-        return json.loads(urllib.request.urlopen(req, timeout=20).read())
+        body = json.dumps({'query': query, 'variables': variables or {}}).encode()
+        req = urllib.request.Request('https://graph.bufferapp.com/graphql',
+            data=body,
+            headers={'Authorization': f'Bearer {BUFFER_TOKEN}',
+                     'Content-Type': 'application/json'})
+        resp = json.loads(urllib.request.urlopen(req, timeout=20).read())
+        if 'errors' in resp:
+            print(f'  GraphQL error: {resp["errors"]}', file=sys.stderr)
+        return resp.get('data', {})
     except Exception as e:
-        print(f'  GET {url[:60]}... failed: {e}', file=sys.stderr)
+        print(f'  GraphQL request failed: {e}', file=sys.stderr)
         return {}
 
-def post_json(url, data, headers=None):
+def slack_dm(text):
     try:
-        body = json.dumps(data).encode()
-        req = urllib.request.Request(url, data=body,
-            headers={'Content-Type': 'application/json', **(headers or {})})
+        body = json.dumps({'channel': GEORGE, 'text': text}).encode()
+        req = urllib.request.Request('https://slack.com/api/chat.postMessage',
+            data=body,
+            headers={'Authorization': f'Bearer {SLACK_TOKEN}',
+                     'Content-Type': 'application/json'})
         return json.loads(urllib.request.urlopen(req, timeout=20).read())
     except Exception as e:
-        print(f'  POST {url[:60]}... failed: {e}', file=sys.stderr)
+        print(f'  Slack failed: {e}', file=sys.stderr)
         return {}
 
-# ── get Buffer profiles ───────────────────────────────────────────────────────
+# ── get scheduled YouTube posts in next 7 days ────────────────────────────────
 
-print('Fetching Buffer profiles...')
-profiles = get(
-    'https://api.bufferapp.com/1/profiles.json',
-    {'Authorization': f'Bearer {BUFFER_TOKEN}'}
-)
+now    = datetime.datetime.utcnow()
+d7     = (now + datetime.timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ')
+now_str = now.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-if not profiles:
-    # Try v2 GraphQL approach
-    print('  Buffer v1 profiles failed, trying without auth header...', file=sys.stderr)
-    profiles = get(f'https://api.bufferapp.com/1/profiles.json?access_token={BUFFER_TOKEN}')
+print('Fetching Buffer scheduled posts...')
+data = graphql('''
+query($input: PostsInput!, $first: Int) {
+  posts(input: $input, first: $first) {
+    edges { node { id status dueAt } }
+    pageInfo { hasNextPage }
+  }
+}
+''', {
+    'input': {
+        'organizationId': BUFFER_ORG_ID,
+        'filter': {
+            'channelIds': [BUFFER_YT_ID],
+            'status': ['scheduled'],
+            'dueAt': {'start': now_str, 'end': d7},
+        },
+    },
+    'first': 50,
+})
 
-if not profiles or not isinstance(profiles, list):
-    print('Could not fetch Buffer profiles — skipping content inventory', file=sys.stderr)
-    sys.exit(0)
-
-# Find YouTube profile
-yt_profile = next(
-    (p for p in profiles if p.get('service') == 'youtube' or 'youtube' in p.get('service', '').lower()),
-    None
-)
-
-if not yt_profile:
-    print('No YouTube profile found in Buffer', file=sys.stderr)
-    sys.exit(0)
-
-yt_profile_id = yt_profile['id']
-print(f'Found YouTube profile: {yt_profile_id}')
-
-# ── get pending posts ─────────────────────────────────────────────────────────
-
-pending = get(
-    f'https://api.bufferapp.com/1/profiles/{yt_profile_id}/updates/pending.json',
-    {'Authorization': f'Bearer {BUFFER_TOKEN}'}
-)
-if not pending:
-    pending = get(
-        f'https://api.bufferapp.com/1/profiles/{yt_profile_id}/updates/pending.json'
-        f'?access_token={BUFFER_TOKEN}'
-    )
-
-updates = pending.get('updates', []) if isinstance(pending, dict) else []
-count = len(updates)
-print(f'YouTube posts in queue: {count}')
+edges = data.get('posts', {}).get('edges', []) or []
+count = len(edges)
+print(f'YouTube posts scheduled in next 7 days: {count}')
 
 # ── alert if low ──────────────────────────────────────────────────────────────
 
 if count < 3:
     msg = (f':warning: YouTube buffer low — only {count} post{"s" if count != 1 else ""} '
            f'scheduled in the next 7 days. Time to process new videos.')
-    result = post_json(
-        'https://slack.com/api/chat.postMessage',
-        {'channel': GEORGE, 'text': msg},
-        {'Authorization': f'Bearer {SLACK_TOKEN}'}
-    )
+    result = slack_dm(msg)
     if result.get('ok'):
         print(f'Alert sent: {count} posts in queue.')
     else:
