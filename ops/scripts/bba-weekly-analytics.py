@@ -26,8 +26,8 @@ INSTANTLY_KEY   = os.environ['INSTANTLY_API_KEY']
 YT_KEY          = os.environ['YOUTUBE_API_KEY']
 YT_CHANNEL      = os.environ['YOUTUBE_CHANNEL_ID']
 GA4_PROP        = os.environ['GA4_PROPERTY_ID']
-GCP_CLIENT_ID   = os.environ['GOOGLE_CLIENT_ID']
-GCP_SECRET      = os.environ['GOOGLE_CLIENT_SECRET']
+GCP_CLIENT_ID   = os.environ.get('GMAIL_CLIENT_ID', os.environ.get('GOOGLE_CLIENT_ID', ''))
+GCP_SECRET      = os.environ.get('GMAIL_CLIENT_SECRET', os.environ.get('GOOGLE_CLIENT_SECRET', ''))
 GCP_REFRESH     = os.environ['GOOGLE_REFRESH_TOKEN']
 SHEET_ID        = os.environ['GOOGLE_CONTENT_SHEET_ID']
 
