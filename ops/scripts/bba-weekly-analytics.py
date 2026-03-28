@@ -22,7 +22,9 @@ load_env()
 GEORGE          = 'U0AETR5UK4Y'
 ANTHROPIC_KEY   = os.environ['ANTHROPIC_API_KEY']
 SLACK_TOKEN     = os.environ['SLACK_BOT_TOKEN']
-INSTANTLY_KEY   = os.environ['INSTANTLY_API_KEY']
+INSTANTLY_KEY          = os.environ['INSTANTLY_API_KEY']
+INSTANTLY_PROXY_URL    = os.environ.get('INSTANTLY_PROXY_URL', '')
+INSTANTLY_PROXY_SECRET = os.environ.get('INSTANTLY_PROXY_SECRET', '')
 YT_KEY          = os.environ['YOUTUBE_API_KEY']
 YT_CHANNEL      = os.environ['YOUTUBE_CHANNEL_ID']
 GA4_PROP        = os.environ['GA4_PROPERTY_ID']
@@ -31,9 +33,18 @@ GCP_SECRET      = os.environ.get('GOOGLE_CLIENT_SECRET', os.environ.get('GMAIL_C
 GCP_REFRESH     = os.environ['GOOGLE_REFRESH_TOKEN']
 SHEET_ID        = os.environ['GOOGLE_CONTENT_SHEET_ID']
 
+def _maybe_proxy(url):
+    if INSTANTLY_PROXY_URL and 'api.instantly.ai' in url:
+        return url.replace('https://api.instantly.ai', INSTANTLY_PROXY_URL.rstrip('/'))
+    return url
+
 def get(url, headers=None):
     try:
-        req = urllib.request.Request(url, headers=headers or {})
+        proxied = _maybe_proxy(url)
+        h = dict(headers or {})
+        if proxied != url and INSTANTLY_PROXY_SECRET:
+            h['X-Proxy-Secret'] = INSTANTLY_PROXY_SECRET
+        req = urllib.request.Request(proxied, headers=h)
         return json.loads(urllib.request.urlopen(req, timeout=20).read())
     except Exception as e:
         print(f'  GET {url[:70]}... failed: {e}', file=sys.stderr)
@@ -89,6 +100,32 @@ def call_llm(prompt, max_tokens=700):
         print(f'  OpenAI failed: {e}', file=sys.stderr)
         return ''
 
+def fetch_instantly_stats(days=7):
+    """Compute sent/open/reply counts from /emails endpoint (analytics endpoint is plan-gated)."""
+    cutoff_str = (datetime.datetime.utcnow() - datetime.timedelta(days=days)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    auth = {'Authorization': f'Bearer {INSTANTLY_KEY}'}
+    counts = {1: 0, 2: 0, 3: 0}
+    for ue_type in (1, 2, 3):
+        starting_after = None
+        while True:
+            qs = f'limit=100&ue_type={ue_type}&timestamp_after={cutoff_str}'
+            if starting_after:
+                qs += f'&starting_after={urllib.parse.quote(starting_after)}'
+            page = get(f'https://api.instantly.ai/api/v2/emails?{qs}', auth)
+            items = page.get('items', [])
+            counts[ue_type] += len(items)
+            if not items or not page.get('next_starting_after'):
+                break
+            starting_after = page['next_starting_after']
+            if counts[ue_type] >= 2000:
+                break
+    sent, opened, replied = counts[1], counts[2], counts[3]
+    return {
+        'sent': sent, 'opened': opened, 'replied': replied,
+        'open_rate': round(opened / sent * 100, 1) if sent else 0,
+        'reply_rate': round(replied / sent * 100, 1) if sent else 0,
+    }
+
 def post_form(url, data):
     try:
         body = urllib.parse.urlencode(data).encode()
@@ -121,11 +158,7 @@ if not gcp_token:
 # ── 1. Instantly 7-day ───────────────────────────────────────────────────────
 
 print('Fetching Instantly 7d...')
-instantly = get(
-    f'https://api.instantly.ai/api/v2/analytics/campaign/summary'
-    f'?start_date={d7_ago}&end_date={today}&limit=10',
-    {'Authorization': f'Bearer {INSTANTLY_KEY}'}
-)
+instantly = fetch_instantly_stats(days=7)
 
 # ── 2. YouTube current subs ───────────────────────────────────────────────────
 
@@ -236,7 +269,7 @@ Rules:
 Format:
 :bar_chart: *BBA Weekly Analytics — w/e {today}*
 
-:email: Outreach (7d) — X sent · X% open · X% reply[· best subject: "..." if available]
+:email: Outreach (7d) — [sent] sent · [open_rate]% open · [reply_rate]% reply (instantly keys: sent, opened, replied, open_rate, reply_rate)
 :globe_with_meridians: Site (7d) — X sessions ([+/-]% wow) · X /assessment views
 :iphone: YouTube — {current_subs} subs ({delta_str} this week)
 :dart: Assessment completions (7d): X
