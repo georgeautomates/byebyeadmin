@@ -1,0 +1,17 @@
+[Unit]
+Description=Paperclip Agent Control Plane
+After=network.target
+
+[Service]
+Type=simple
+User=openclaw
+WorkingDirectory=/home/openclaw/.paperclip/instances/default
+ExecStart=/home/openclaw/.nvm/versions/node/v22.22.1/bin/npx paperclipai start
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/home/openclaw/.openclaw/paperclip.log
+StandardError=append:/home/openclaw/.openclaw/paperclip.log
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=BBA Paperclip Webhook Router
+After=network.target paperclip.service
+
+[Service]
+Type=simple
+User=openclaw
+WorkingDirectory=/home/openclaw/byebyeadmin/ops
+ExecStart=/usr/bin/python3 /home/openclaw/byebyeadmin/ops/paperclip-webhook.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/home/openclaw/.openclaw/paperclip-webhook.log
+StandardError=append:/home/openclaw/.openclaw/paperclip-webhook.log
+EnvironmentFile=/home/openclaw/byebyeadmin/ops/.env
+
+[Install]
+WantedBy=multi-user.target
