@@ -41,8 +41,8 @@ const ANTHROPIC_KEY  = process.env.ANTHROPIC_API_KEY;
 const SLACK_TOKEN    = process.env.SLACK_BOT_TOKEN;
 const OPENAI_KEY     = process.env.OPENAI_API_KEY;
 const BUFFER_TOKEN   = process.env.BUFFER_TOKEN;
-const GCP_CLIENT_ID  = process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
-const GCP_SECRET     = process.env.GMAIL_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+const GCP_CLIENT_ID  = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
+const GCP_SECRET     = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
 const GCP_REFRESH    = process.env.GOOGLE_REFRESH_TOKEN;
 const SHEET_ID       = process.env.GOOGLE_CONTENT_SHEET_ID;
 const DRIVE_FOLDER   = process.env.GOOGLE_DRIVE_FOLDER_ID;
@@ -122,16 +122,28 @@ async function slackDm(text) {
   return r;
 }
 
-// ── Claude ────────────────────────────────────────────────────────────────────
+// ── LLM (Anthropic → Gemini fallback) ─────────────────────────────────────────
 
-async function claude(prompt, maxTokens = 1500) {
+async function callLlm(prompt, maxTokens = 1500) {
+  // Try Anthropic first
   const resp = await postJson(
     'https://api.anthropic.com/v1/messages',
     { model: 'claude-sonnet-4-6', max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }] },
     { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' }
   );
-  return resp?.content?.[0]?.text || '';
+  const text = resp?.content?.[0]?.text;
+  if (text) return text;
+
+  // Fall back to Gemini
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) return '';
+  const gr = await postJson(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+    { contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } },
+    {}
+  );
+  return gr?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
 // ── Sheets helpers ────────────────────────────────────────────────────────────
@@ -327,7 +339,7 @@ Rules:
 - LinkedIn: professional, 2-3 short paragraphs, no em dashes
 - YouTube description: 2-3 sentences + hashtags`;
 
-  const raw = await claude(contentPrompt, 1500);
+  const raw = await callLlm(contentPrompt, 1500);
   let content = {};
   try {
     const jsonMatch = raw.match(/\{[\s\S]+\}/);

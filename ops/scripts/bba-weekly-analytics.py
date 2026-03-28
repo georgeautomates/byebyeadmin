@@ -49,6 +49,35 @@ def post_json(url, data, headers=None):
         print(f'  POST {url[:70]}... failed: {e}', file=sys.stderr)
         return {}
 
+def call_llm(prompt, max_tokens=700):
+    """Try Anthropic, fall back to Gemini if rate-limited."""
+    body = json.dumps({'model': 'claude-haiku-4-5-20251001', 'max_tokens': max_tokens,
+        'messages': [{'role': 'user', 'content': prompt}]}).encode()
+    req = urllib.request.Request('https://api.anthropic.com/v1/messages', data=body,
+        headers={'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01',
+                 'Content-Type': 'application/json'})
+    try:
+        resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
+        text = resp.get('content', [{}])[0].get('text', '')
+        if text:
+            return text
+    except Exception as e:
+        print(f'  Anthropic failed: {e} — trying Gemini', file=sys.stderr)
+    gemini_key = os.environ.get('GEMINI_API_KEY', '')
+    if not gemini_key:
+        return ''
+    body = json.dumps({'contents': [{'parts': [{'text': prompt}]}],
+        'generationConfig': {'maxOutputTokens': max_tokens}}).encode()
+    url = (f'https://generativelanguage.googleapis.com/v1beta/models/'
+           f'gemini-2.0-flash:generateContent?key={gemini_key}')
+    req = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'})
+    try:
+        resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
+        return resp['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e:
+        print(f'  Gemini failed: {e}', file=sys.stderr)
+        return ''
+
 def post_form(url, data):
     try:
         body = urllib.parse.urlencode(data).encode()
@@ -208,13 +237,8 @@ yt_prev_subs={prev_subs}
 ga4_sessions_wow={json.dumps(ga4_sessions)}
 ga4_assessment_wow={json.dumps(ga4_assess)}"""
 
-claude = post_json(
-    'https://api.anthropic.com/v1/messages',
-    {'model': 'claude-haiku-4-5-20251001', 'max_tokens': 700,
-     'messages': [{'role': 'user', 'content': prompt}]},
-    {'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01'}
-)
-text = claude.get('content', [{}])[0].get('text', '')
+print('Calling LLM...')
+text = call_llm(prompt, max_tokens=700)
 if not text:
     text = ':warning: Weekly analytics failed — check cron.log'
 
