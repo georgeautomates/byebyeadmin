@@ -181,19 +181,12 @@ if gcp_token:
 
 # ── Clarity (max 2 calls) ─────────────────────────────────────────────────────
 
-print('Fetching Clarity dashboard...')
+print('Fetching Clarity (3-day metrics)...')
 clarity_dash = get(
-    f'https://www.clarity.ms/api/v1/projects/{CLARITY_PROJECT}/metrics'
-    f'?startDate={d7_ago}&endDate=yesterday',
+    'https://www.clarity.ms/export-data/api/v1/project-live-insights?numOfDays=3',
     {'Authorization': f'Bearer {CLARITY_TOKEN}'}
 )
-
-print('Fetching Clarity /assessment page...')
-clarity_assess = get(
-    f'https://www.clarity.ms/api/v1/projects/{CLARITY_PROJECT}/pages'
-    f'?startDate={d7_ago}&endDate=yesterday&pageUrl=/assessment',
-    {'Authorization': f'Bearer {CLARITY_TOKEN}'}
-)
+clarity_assess = {}  # page-level filtering not supported in export API
 
 # ── Claude: 6-section report ──────────────────────────────────────────────────
 

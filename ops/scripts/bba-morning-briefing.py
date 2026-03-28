@@ -166,8 +166,7 @@ else:
 
 print('Fetching Clarity...')
 clarity = get(
-    f'https://www.clarity.ms/api/v1/projects/{CLARITY_PROJECT}/metrics'
-    f'?startDate={start8_str}&endDate={yesterday_str}',
+    'https://www.clarity.ms/export-data/api/v1/project-live-insights?numOfDays=3',
     {'Authorization': f'Bearer {CLARITY_TOKEN}'}
 )
 
