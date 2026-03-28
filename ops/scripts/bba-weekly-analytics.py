@@ -239,11 +239,12 @@ if gcp_token and current_subs:
 
     assess_7d = 0
     try:
-        assess_7d = sum(
-            int(r.get('metricValues', [{'value': '0'}])[0].get('value', 0))
-            for r in ga4_assess.get('rows', [])
-            if r.get('dimensionValues', [{}])[0].get('value', '').startswith('/assessment')
-        )
+        for r in ga4_assess.get('rows', []):
+            dim = r.get('dimensionValues', [{}])[0].get('value', '')
+            # With named dateRanges and no explicit dimensions, GA4 returns the range
+            # name as the sole dimension ('this_week' / 'last_week'), not a page path
+            if dim in ('this_week', 'date_range_0'):
+                assess_7d += int(r.get('metricValues', [{'value': '0'}])[0].get('value', 0))
     except Exception:
         pass
 
@@ -271,14 +272,15 @@ Format:
 :bar_chart: *BBA Weekly Analytics — w/e {today}*
 
 :email: Outreach (7d) — [sent] sent · [open_rate]% open · [reply_rate]% reply (instantly keys: sent, opened, replied, open_rate, reply_rate)
-:globe_with_meridians: Site (7d) — X sessions ([+/-]% wow) · X /assessment views
+:globe_with_meridians: Site (7d) — X sessions ([+/-]% wow) · {assess_7d} /assessment views
 :iphone: YouTube — {current_subs} subs ({delta_str} this week)
-:dart: Assessment completions (7d): X
+:dart: Assessment completions (7d): X (use eventCount from this_week row of ga4_assessment_wow)
 
 RAW DATA:
 instantly_7d={json.dumps(instantly)}
 youtube_current_subs={current_subs}
 yt_prev_subs={prev_subs}
+assess_views_7d={assess_7d}
 ga4_sessions_wow={json.dumps(ga4_sessions)}
 ga4_assessment_wow={json.dumps(ga4_assess)}"""
 
