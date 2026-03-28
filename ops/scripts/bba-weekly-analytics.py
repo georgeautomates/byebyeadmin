@@ -49,7 +49,7 @@ def get(url, headers=None):
         return json.loads(urllib.request.urlopen(req, timeout=20).read())
     except Exception as e:
         print(f'  GET {url[:70]}... failed: {e}', file=sys.stderr)
-        return {}
+        return None
 
 def post_json(url, data, headers=None):
     try:
@@ -106,6 +106,7 @@ def fetch_instantly_stats(days=7):
     cutoff_str = (datetime.datetime.utcnow() - datetime.timedelta(days=days)).strftime('%Y-%m-%dT%H:%M:%SZ')
     auth = {'Authorization': f'Bearer {INSTANTLY_KEY}'}
     counts = {1: 0, 2: 0, 3: 0}
+    failed = set()
     for ue_type in (1, 2, 3):
         starting_after = None
         while True:
@@ -113,6 +114,9 @@ def fetch_instantly_stats(days=7):
             if starting_after:
                 qs += f'&starting_after={urllib.parse.quote(starting_after)}'
             page = get(f'https://api.instantly.ai/api/v2/emails?{qs}', auth)
+            if page is None:
+                failed.add(ue_type)
+                break
             items = page.get('items', [])
             counts[ue_type] += len(items)
             if not items or not page.get('next_starting_after'):
@@ -120,11 +124,13 @@ def fetch_instantly_stats(days=7):
             starting_after = page['next_starting_after']
             if counts[ue_type] >= 2000:
                 break
-    sent, opened, replied = counts[1], counts[2], counts[3]
+    sent    = counts[1] if 1 not in failed else None
+    opened  = counts[2] if 2 not in failed else None
+    replied = counts[3] if 3 not in failed else None
     return {
         'sent': sent, 'opened': opened, 'replied': replied,
-        'open_rate': round(opened / sent * 100, 1) if sent else 0,
-        'reply_rate': round(replied / sent * 100, 1) if sent else 0,
+        'open_rate':  round(opened / sent * 100, 1) if (sent and opened is not None) else None,
+        'reply_rate': round(replied / sent * 100, 1) if (sent and replied is not None) else None,
     }
 
 def post_form(url, data):
@@ -170,7 +176,7 @@ yt = get(
 )
 current_subs = 0
 try:
-    current_subs = int(yt['items'][0]['statistics']['subscriberCount'])
+    current_subs = int((yt or {})['items'][0]['statistics']['subscriberCount'])
 except Exception:
     pass
 
@@ -213,7 +219,7 @@ if gcp_token:
         f'/values/Analytics%20State!A:E',
         {'Authorization': f'Bearer {gcp_token}'}
     )
-    sheet_rows = sheet.get('values', [])
+    sheet_rows = (sheet or {}).get('values', [])
     if len(sheet_rows) > 1:
         last_row = sheet_rows[-1]
         try:
@@ -263,7 +269,8 @@ prompt = f"""Format a BBA weekly analytics Slack message from this raw data.
 
 Rules:
 - No em dashes
-- Use "unavailable" where data is missing
+- Use "unavailable" where data is missing or null
+- Instantly fields that are null/None mean the API was rate-limited — show "unavailable" not 0
 - Include week-over-week deltas where possible (this_week vs last_week in GA4)
 - YouTube delta: current {current_subs} subs, previous week {prev_subs} ({delta_str})
 - Be concise — Slack DM, not a report
@@ -271,7 +278,7 @@ Rules:
 Format:
 :bar_chart: *BBA Weekly Analytics — w/e {today}*
 
-:email: Outreach (7d) — [sent] sent · [open_rate]% open · [reply_rate]% reply (instantly keys: sent, opened, replied, open_rate, reply_rate)
+:email: Outreach (7d) — [sent] sent · [open_rate]% open · [reply_rate]% reply (null = unavailable)
 :globe_with_meridians: Site (7d) — X sessions ([+/-]% wow) · {assess_7d} /assessment views
 :iphone: YouTube — {current_subs} subs ({delta_str} this week)
 :dart: Assessment completions (7d): X (use eventCount from this_week row of ga4_assessment_wow)
