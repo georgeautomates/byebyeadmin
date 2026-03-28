@@ -6,7 +6,7 @@ George's AI operating system for running ByeByeAdmin. Lives in `ops/` inside the
 
 **Two environments:**
 - **MacBook (Claude Code in VS Code)** — active build work, deliberate tasks
-- **Hetzner VPS** — runs the Slack router (Socket Mode listener) and cron jobs that fire Claude Code remote triggers. All AI logic runs in Anthropic's cloud via remote triggers — the VPS just routes and schedules.
+- **Hetzner VPS** — runs the Slack router (Socket Mode listener) and 5 direct cron scripts that call APIs and post to Slack. All AI logic runs on the VPS itself via an LLM cascade (Anthropic → Gemini → OpenAI).
 
 ## Projects
 
@@ -57,40 +57,49 @@ skills/transcription.md         — category: ops
 skills/wrap-up.md               — category: meta           (run at session end)
 ```
 
-## Agent architecture (Claude Code remote triggers)
+## Agent architecture (VPS cron scripts)
 
-All AI logic runs as Claude Code remote triggers on Anthropic's cloud — no ANTHROPIC_API_KEY needed, runs on George's Claude Max subscription. The VPS runs only the Slack router and fires triggers via cron.
+All scheduled AI logic runs as Python/Node.js scripts directly on the VPS. Scripts call APIs, run an LLM cascade (Anthropic → Gemini → OpenAI), and post results to Slack via the Johnson bot. The VPS also runs the Slack router for interactive DM handling.
 
-### Remote triggers (configured on claude.ai)
+### VPS cron scripts
 
-| Trigger | ID | Purpose | Fired by |
-|---------|-----|---------|---------|
-| `bba-briefings` | `trig_01Urea4LcozDYEr9RwUXhJe9` | Morning briefing, weekly analytics, content inventory | VPS crontab |
-| `bba-content` | `trig_019Avfkx4idVxQkv6MBwhY1N` | Content pipeline: Drive → Whisper → copy gen → Buffer | VPS crontab + Slack router |
-| `bba-research` | `trig_01Bi9uBKy3KoyojZb54ZqFqx` | On-demand last30days research | Slack router (`last30 [topic]`) |
-| `bba-chat` | `trig_01FXCQ6ByRHo8dKVWnA7aQRG` | Ad-hoc DM chat + agent tasks | Slack router (fallback + `agent:`) |
-| `bba-website-review` | `trig_01UVD2pCx7cC7tHUWb69CSiB` | Weekly GA4 + Clarity website report | VPS crontab (Sunday 8am UTC) |
-
-Trigger prompt files are in `triggers/` — copy into claude.ai Remote Trigger instructions field.
+| Script | Schedule | Purpose |
+|--------|----------|---------|
+| `ops/scripts/bba-morning-briefing.py` | 8am UTC Mon-Fri | Daily snapshot: Instantly + YouTube + GA4 + Clarity → Slack |
+| `ops/scripts/bba-weekly-analytics.py` | 8:30am UTC Monday | 7-day KPIs with WoW deltas + writes Google Sheets → Slack |
+| `ops/scripts/bba-pipeline-check.js` | 9am + 5pm UTC daily | Drive → Whisper → Claude → Buffer content pipeline |
+| `ops/scripts/bba-content-inventory.py` | 6am UTC daily | Buffer YouTube queue alert if <3 posts in next 7 days |
+| `ops/scripts/bba-website-review.py` | 8am UTC Sunday | GA4 + Clarity weekly website report (Claude Sonnet) → Slack |
 
 ### VPS files
 
 ```
-agents/slack-router.js   — LIVE service: ~75-line Socket Mode router, fires remote triggers
-agents/archive/          — old agent implementations kept for reference
-agents/prospector.md     — spec only (implement: apollo → CSV → Slack)
-agents/transcription.md  — spec only (implement: voice → Whisper → structured output)
+agents/slack-router.js   — LIVE service: Socket Mode router, handles interactive DMs
+agents/archive/          — old remote trigger implementations (reference only)
 ```
 
-### VPS crontab (5 entries firing remote triggers)
+### VPS crontab (actual entries)
 
 ```
-0 8 * * 1-5   — MORNING BRIEFING    → bba-briefings trigger
-30 8 * * 1    — WEEKLY ANALYTICS    → bba-briefings trigger
-0 9,17 * * *  — PIPELINE CHECK      → bba-content trigger
-0 6 * * *     — CONTENT INVENTORY   → bba-briefings trigger
-0 8 * * 0     — WEEKLY WEBSITE REVIEW → bba-website-review trigger
+0 8 * * 1-5   python3 /home/openclaw/byebyeadmin/ops/scripts/bba-morning-briefing.py >> ~/.openclaw/cron.log 2>&1
+30 8 * * 1    python3 /home/openclaw/byebyeadmin/ops/scripts/bba-weekly-analytics.py >> ~/.openclaw/cron.log 2>&1
+0 9,17 * * *  /home/openclaw/.nvm/versions/node/v22.22.1/bin/node /home/openclaw/byebyeadmin/ops/scripts/bba-pipeline-check.js --check >> ~/.openclaw/cron.log 2>&1
+0 6 * * *     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-content-inventory.py >> ~/.openclaw/cron.log 2>&1
+0 8 * * 0     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-website-review.py >> ~/.openclaw/cron.log 2>&1
 ```
+
+Logs: `tail -f ~/.openclaw/cron.log` on VPS.
+
+### Instantly API proxy
+
+Cloudflare Worker (`instantly-proxy.georgeautomates.workers.dev`) proxies VPS → api.instantly.ai, bypassing Cloudflare's ASN block on Hetzner IPs. Secret in VPS `.env` as `INSTANTLY_PROXY_SECRET`. Worker code in `ops/instantly-proxy/worker.js`.
+
+### Remote triggers (kept for interactive DM handling only)
+
+| Trigger | Purpose |
+|---------|---------|
+| `bba-research` | On-demand last30days research via Slack (`last30 [topic]`) |
+| `bba-chat` | Ad-hoc DM chat + agent tasks (Slack router fallback) |
 
 ### Content pipeline approval state
 
@@ -110,7 +119,7 @@ Status values: awaiting → processed | skipped
 | Vercel CLI | Deployments | Live — `VERCEL_TOKEN` in env |
 | gh CLI | GitHub | Live — authenticated as `georgeautomates` |
 | n8n | Workflow automation | Live — MCP wired in Claude Code |
-| GA4 | Website analytics | Live — `GA4_PROPERTY_ID=527598212`, OAuth via `GMAIL_*` vars |
+| GA4 | Website analytics | Live — `GA4_PROPERTY_ID=527598212`, OAuth via `GOOGLE_CLIENT_ID`/`GOOGLE_REFRESH_TOKEN` (fallback: `GMAIL_*` vars) |
 | Perplexity | Web research | Live — `PERPLEXITY_API_KEY` in env |
 | Tavily | Web search | Live — `TAVILY_API_KEY` in env |
 
