@@ -29,11 +29,11 @@ INSTANTLY_KEY   = os.environ['INSTANTLY_API_KEY']
 YT_KEY          = os.environ['YOUTUBE_API_KEY']
 YT_CHANNEL      = os.environ['YOUTUBE_CHANNEL_ID']
 GA4_PROP        = os.environ['GA4_PROPERTY_ID']
-GCP_CLIENT_ID   = os.environ.get('GMAIL_CLIENT_ID', os.environ.get('GOOGLE_CLIENT_ID', ''))
-GCP_SECRET      = os.environ.get('GMAIL_CLIENT_SECRET', os.environ.get('GOOGLE_CLIENT_SECRET', ''))
+GCP_CLIENT_ID   = os.environ.get('GOOGLE_CLIENT_ID', os.environ.get('GMAIL_CLIENT_ID', ''))
+GCP_SECRET      = os.environ.get('GOOGLE_CLIENT_SECRET', os.environ.get('GMAIL_CLIENT_SECRET', ''))
 GCP_REFRESH     = os.environ['GOOGLE_REFRESH_TOKEN']
 CLARITY_TOKEN   = os.environ['CLARITY_API_TOKEN']
-CLARITY_PROJECT = os.environ['CLARITY_PROJECT_ID']
+CLARITY_PROJECT = os.environ.get('CLARITY_PROJECT_ID', 'r4uxcnbez8')
 
 # ── http helpers ──────────────────────────────────────────────────────────────
 
