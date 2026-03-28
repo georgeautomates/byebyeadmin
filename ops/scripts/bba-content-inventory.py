@@ -78,6 +78,10 @@ query($input: PostsInput!, $first: Int) {
     'first': 50,
 })
 
+if not data:
+    print('Buffer unreachable — skipping content inventory.', file=sys.stderr)
+    sys.exit(0)
+
 edges = data.get('posts', {}).get('edges', []) or []
 count = len(edges)
 print(f'YouTube posts scheduled in next 7 days: {count}')
