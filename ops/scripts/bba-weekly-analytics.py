@@ -44,6 +44,7 @@ def get(url, headers=None):
         h = dict(headers or {})
         if proxied != url and INSTANTLY_PROXY_SECRET:
             h['X-Proxy-Secret'] = INSTANTLY_PROXY_SECRET
+            h.setdefault('User-Agent', 'curl/7.88.1')  # Cloudflare blocks Python-urllib UA
         req = urllib.request.Request(proxied, headers=h)
         return json.loads(urllib.request.urlopen(req, timeout=20).read())
     except Exception as e:
