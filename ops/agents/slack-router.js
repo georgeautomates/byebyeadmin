@@ -19,6 +19,7 @@
 import pkg from '@slack/bolt';
 const { App } = pkg;
 import https from 'https';
+import { exec } from 'child_process';
 
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
@@ -97,8 +98,20 @@ app.message(async ({ message, say, client }) => {
 
   // --- title [n], ig [n] or skip: content approval ---
   if (/^title\s+\d/i.test(text) || /^skip$/i.test(text)) {
-    await writeApprovalToSheets(text, text, message.channel, threadTs);
-    await say({ text: `Got it: "${text}" — will be processed at next pipeline run (9am/5pm UTC).`, thread_ts: message.ts });
+    const scriptPath = '/home/openclaw/byebyeadmin/ops/scripts/bba-pipeline-check.js';
+    const nodeCmd = '/home/openclaw/.nvm/versions/node/v22.22.1/bin/node';
+    if (/^skip$/i.test(text)) {
+      exec(`${nodeCmd} ${scriptPath} --skip`, (err, stdout, stderr) => {
+        if (err) console.error('Pipeline skip error:', stderr);
+        else console.log('Pipeline skip:', stdout);
+      });
+    } else {
+      exec(`${nodeCmd} ${scriptPath} --approve ${JSON.stringify(text)}`, (err, stdout, stderr) => {
+        if (err) console.error('Pipeline approval error:', stderr);
+        else console.log('Pipeline approval:', stdout);
+      });
+    }
+    await say({ text: 'On it...', thread_ts: message.ts });
     return;
   }
 
