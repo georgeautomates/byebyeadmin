@@ -45,9 +45,9 @@ SLACK_TOKEN     = os.environ['SLACK_BOT_TOKEN']
 INSTANTLY_KEY   = os.environ['INSTANTLY_API_KEY']
 INSTANTLY_PROXY_URL    = os.environ.get('INSTANTLY_PROXY_URL', '')
 INSTANTLY_PROXY_SECRET = os.environ.get('INSTANTLY_PROXY_SECRET', '')
-GCP_CLIENT_ID   = os.environ.get('GOOGLE_CLIENT_ID', os.environ.get('GMAIL_CLIENT_ID', ''))
-GCP_SECRET      = os.environ.get('GOOGLE_CLIENT_SECRET', os.environ.get('GMAIL_CLIENT_SECRET', ''))
-GCP_REFRESH     = os.environ.get('GOOGLE_REFRESH_TOKEN', '')
+GCP_CLIENT_ID   = os.environ.get('GOOGLE_DRIVE_CLIENT_ID', '')  # gmail.com — owns ops Sheets
+GCP_SECRET      = os.environ.get('GOOGLE_DRIVE_CLIENT_SECRET', '')
+GCP_REFRESH     = os.environ.get('GOOGLE_DRIVE_REFRESH_TOKEN', '')
 SHEET_ID        = os.environ.get('GOOGLE_CONTENT_SHEET_ID', '')
 
 today = datetime.datetime.utcnow().strftime('%Y-%m-%d')

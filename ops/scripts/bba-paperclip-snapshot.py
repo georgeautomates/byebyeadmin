@@ -25,9 +25,9 @@ load_env()
 
 PAPERCLIP_URL  = os.environ.get('PAPERCLIP_API_URL', 'http://localhost:3100')
 COMPANY_ID     = os.environ.get('PAPERCLIP_COMPANY_ID', '')
-GCP_CLIENT_ID  = os.environ.get('GOOGLE_CLIENT_ID', os.environ.get('GMAIL_CLIENT_ID', ''))
-GCP_SECRET     = os.environ.get('GOOGLE_CLIENT_SECRET', os.environ.get('GMAIL_CLIENT_SECRET', ''))
-GCP_REFRESH    = os.environ.get('GOOGLE_REFRESH_TOKEN', '')
+GCP_CLIENT_ID  = os.environ.get('GOOGLE_DRIVE_CLIENT_ID', '')  # gmail.com — Docs creation
+GCP_SECRET     = os.environ.get('GOOGLE_DRIVE_CLIENT_SECRET', '')
+GCP_REFRESH    = os.environ.get('GOOGLE_DRIVE_REFRESH_TOKEN', '')
 
 today = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
 

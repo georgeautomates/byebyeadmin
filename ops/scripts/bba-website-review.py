@@ -23,9 +23,12 @@ GEORGE          = 'U0AETR5UK4Y'
 ANTHROPIC_KEY   = os.environ['ANTHROPIC_API_KEY']
 SLACK_TOKEN     = os.environ['SLACK_BOT_TOKEN']
 GA4_PROP        = os.environ['GA4_PROPERTY_ID']
-GCP_CLIENT_ID   = os.environ.get('GOOGLE_CLIENT_ID', os.environ.get('GMAIL_CLIENT_ID', ''))
-GCP_SECRET      = os.environ.get('GOOGLE_CLIENT_SECRET', os.environ.get('GMAIL_CLIENT_SECRET', ''))
-GCP_REFRESH     = os.environ['GOOGLE_REFRESH_TOKEN']
+WS_CLIENT_ID    = os.environ.get('GOOGLE_CLIENT_ID', '')        # byebyeadmin.com — GA4
+WS_SECRET       = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+WS_REFRESH      = os.environ.get('GOOGLE_REFRESH_TOKEN', '')
+P_CLIENT_ID     = os.environ.get('GOOGLE_DRIVE_CLIENT_ID', '')  # gmail.com — Sheets
+P_SECRET        = os.environ.get('GOOGLE_DRIVE_CLIENT_SECRET', '')
+P_REFRESH       = os.environ.get('GOOGLE_DRIVE_REFRESH_TOKEN', '')
 CLARITY_TOKEN   = os.environ['CLARITY_API_TOKEN']
 CLARITY_PROJECT = os.environ.get('CLARITY_PROJECT_ID', 'r4uxcnbez8')
 SHEET_ID        = os.environ.get('GOOGLE_CONTENT_SHEET_ID', '')
@@ -107,16 +110,23 @@ d8_ago  = (now - datetime.timedelta(days=8)).strftime('%Y-%m-%d')
 d14_ago = (now - datetime.timedelta(days=14)).strftime('%Y-%m-%d')
 d9_ago  = (now - datetime.timedelta(days=9)).strftime('%Y-%m-%d')
 
-# ── GCP token ────────────────────────────────────────────────────────────────
+# ── tokens ───────────────────────────────────────────────────────────────────
 
-print('Getting GCP token...')
-token_resp = post_form('https://oauth2.googleapis.com/token', {
-    'client_id': GCP_CLIENT_ID, 'client_secret': GCP_SECRET,
-    'refresh_token': GCP_REFRESH, 'grant_type': 'refresh_token',
-})
-gcp_token = token_resp.get('access_token', '')
+print('Getting workspace token (GA4)...')
+gcp_token = post_form('https://oauth2.googleapis.com/token', {
+    'client_id': WS_CLIENT_ID, 'client_secret': WS_SECRET,
+    'refresh_token': WS_REFRESH, 'grant_type': 'refresh_token',
+}).get('access_token', '')
 if not gcp_token:
-    print('GCP token failed', file=sys.stderr)
+    print('Workspace token failed', file=sys.stderr)
+
+print('Getting personal token (Sheets)...')
+p_token = post_form('https://oauth2.googleapis.com/token', {
+    'client_id': P_CLIENT_ID, 'client_secret': P_SECRET,
+    'refresh_token': P_REFRESH, 'grant_type': 'refresh_token',
+}).get('access_token', '')
+if not p_token:
+    print('Personal token failed — Sheets writes will be skipped', file=sys.stderr)
 
 # ── GA4 Report A: traffic by channel ─────────────────────────────────────────
 
@@ -277,13 +287,13 @@ if cro_raw:
             cro_slack_lines.append(f'• *{page}*: {change}')
 
 # Append CRO rows to Google Sheet "CRO Backlog" tab
-if cro_tasks and gcp_token and SHEET_ID:
+if cro_tasks and p_token and SHEET_ID:
     print(f'Writing {len(cro_tasks)} CRO tasks to sheet...')
     post_json(
         f'https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}'
         f'/values/CRO%20Backlog!A:F:append?valueInputOption=USER_ENTERED',
         {'values': cro_tasks},
-        {'Authorization': f'Bearer {gcp_token}'}
+        {'Authorization': f'Bearer {p_token}'}
     )
 
 if cro_slack_lines:

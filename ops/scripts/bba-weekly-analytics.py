@@ -28,9 +28,12 @@ INSTANTLY_PROXY_SECRET = os.environ.get('INSTANTLY_PROXY_SECRET', '')
 YT_KEY          = os.environ['YOUTUBE_API_KEY']
 YT_CHANNEL      = os.environ['YOUTUBE_CHANNEL_ID']
 GA4_PROP        = os.environ['GA4_PROPERTY_ID']
-GCP_CLIENT_ID   = os.environ.get('GOOGLE_CLIENT_ID', os.environ.get('GMAIL_CLIENT_ID', ''))
-GCP_SECRET      = os.environ.get('GOOGLE_CLIENT_SECRET', os.environ.get('GMAIL_CLIENT_SECRET', ''))
-GCP_REFRESH     = os.environ['GOOGLE_REFRESH_TOKEN']
+WS_CLIENT_ID    = os.environ.get('GOOGLE_CLIENT_ID', '')        # byebyeadmin.com — GA4 only
+WS_SECRET       = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+WS_REFRESH      = os.environ.get('GOOGLE_REFRESH_TOKEN', '')
+P_CLIENT_ID     = os.environ.get('GOOGLE_DRIVE_CLIENT_ID', '')  # gmail.com — Sheets
+P_SECRET        = os.environ.get('GOOGLE_DRIVE_CLIENT_SECRET', '')
+P_REFRESH       = os.environ.get('GOOGLE_DRIVE_REFRESH_TOKEN', '')
 SHEET_ID        = os.environ['GOOGLE_CONTENT_SHEET_ID']
 
 def _maybe_proxy(url):
@@ -151,16 +154,25 @@ d7_ago   = (now - datetime.timedelta(days=7)).strftime('%Y-%m-%d')
 d14_ago  = (now - datetime.timedelta(days=14)).strftime('%Y-%m-%d')
 d8_ago   = (now - datetime.timedelta(days=8)).strftime('%Y-%m-%d')
 
-# ── GA4 token ────────────────────────────────────────────────────────────────
+# ── tokens ───────────────────────────────────────────────────────────────────
 
-print('Getting GA4 + Sheets token...')
-token_resp = post_form('https://oauth2.googleapis.com/token', {
-    'client_id': GCP_CLIENT_ID, 'client_secret': GCP_SECRET,
-    'refresh_token': GCP_REFRESH, 'grant_type': 'refresh_token',
-})
-gcp_token = token_resp.get('access_token', '')
-if not gcp_token:
-    print('GCP token failed', file=sys.stderr)
+print('Getting workspace token (GA4)...')
+ws_token = post_form('https://oauth2.googleapis.com/token', {
+    'client_id': WS_CLIENT_ID, 'client_secret': WS_SECRET,
+    'refresh_token': WS_REFRESH, 'grant_type': 'refresh_token',
+}).get('access_token', '')
+if not ws_token:
+    print('Workspace token failed', file=sys.stderr)
+
+print('Getting personal token (Sheets)...')
+p_token = post_form('https://oauth2.googleapis.com/token', {
+    'client_id': P_CLIENT_ID, 'client_secret': P_SECRET,
+    'refresh_token': P_REFRESH, 'grant_type': 'refresh_token',
+}).get('access_token', '')
+if not p_token:
+    print('Personal token failed — Sheets writes will be skipped', file=sys.stderr)
+
+gcp_token = ws_token  # alias used by GA4 calls below
 
 # ── 1. Instantly 7-day ───────────────────────────────────────────────────────
 
@@ -212,12 +224,12 @@ if gcp_token:
 
 prev_subs = 0
 sheet_rows = []
-if gcp_token:
+if p_token:
     print('Reading Analytics State sheet...')
     sheet = get(
         f'https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}'
         f'/values/Analytics%20State!A:E',
-        {'Authorization': f'Bearer {gcp_token}'}
+        {'Authorization': f'Bearer {p_token}'}
     )
     sheet_rows = (sheet or {}).get('values', [])
     if len(sheet_rows) > 1:
@@ -231,7 +243,7 @@ sub_delta = current_subs - prev_subs if prev_subs else 0
 
 # ── 5. Append new row to Analytics State ─────────────────────────────────────
 
-if gcp_token and current_subs:
+if p_token and current_subs:
     print('Writing Analytics State row...')
     # Sum sessions from GA4 this week
     sessions_7d = 0
@@ -258,7 +270,7 @@ if gcp_token and current_subs:
         f'https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}'
         f'/values/Analytics%20State!A:E:append?valueInputOption=USER_ENTERED',
         {'values': [[today, str(current_subs), '', str(sessions_7d), str(assess_7d)]]},
-        {'Authorization': f'Bearer {gcp_token}'}
+        {'Authorization': f'Bearer {p_token}'}
     )
 
 # ── 6. Claude format ──────────────────────────────────────────────────────────

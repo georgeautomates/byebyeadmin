@@ -3,10 +3,9 @@
 //
 // Required env vars:
 //   GOOGLE_SHEETS_LEAD_ID   — spreadsheet ID (from the URL: /spreadsheets/d/{ID}/edit)
-//   GMAIL_CLIENT_ID         — same Google OAuth app used for Gmail send
-//   GMAIL_CLIENT_SECRET
-//   GMAIL_REFRESH_TOKEN     — must include scope: spreadsheets AND gmail.send
-//                             If your existing token only has gmail.send, re-authorise with both scopes.
+//   GOOGLE_CLIENT_ID        — george@byebyeadmin.com OAuth app (698251746508-...)
+//   GOOGLE_CLIENT_SECRET
+//   GOOGLE_REFRESH_TOKEN    — must include scope: spreadsheets (run scripts/google-reauth.mjs to refresh)
 //
 // Sheet setup: create a sheet called "Leads" with headers in row 1:
 //   Timestamp | First Name | Email | Readiness Score | Vehicles | Annual Saving | Maturity Stage
@@ -25,9 +24,9 @@ async function getAccessToken(): Promise<string> {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: process.env.GMAIL_CLIENT_ID!,
-      client_secret: process.env.GMAIL_CLIENT_SECRET!,
-      refresh_token: process.env.GMAIL_REFRESH_TOKEN!,
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      refresh_token: process.env.GOOGLE_REFRESH_TOKEN!,
       grant_type: 'refresh_token',
     }),
   });
