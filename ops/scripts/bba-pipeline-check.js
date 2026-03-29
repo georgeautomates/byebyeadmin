@@ -208,34 +208,41 @@ function scheduleDate() {
 
 // ── Buffer helpers ─────────────────────────────────────────────────────────────
 
-let _bufferProfiles = null;
-async function getBufferProfiles() {
-  if (_bufferProfiles) return _bufferProfiles;
-  const resp = await getJson(`https://api.bufferapp.com/1/profiles.json?access_token=${BUFFER_TOKEN}`);
-  _bufferProfiles = Array.isArray(resp) ? resp : [];
-  return _bufferProfiles;
-}
+const BUFFER_CHANNELS = {
+  instagram: '69b7de067be9f8b1715f2df4',
+  youtube:   '69b7df3d7be9f8b1715f313c',
+  linkedin:  null, // not connected
+};
 
 async function bufferPost(serviceType, text, scheduledAt) {
-  const profiles = await getBufferProfiles();
-  const profile = profiles.find(p => p.service?.toLowerCase().includes(serviceType));
-  if (!profile) { console.error(`No Buffer profile found for: ${serviceType}`); return null; }
+  const channelId = BUFFER_CHANNELS[serviceType.toLowerCase()];
+  if (!channelId) { console.error(`No Buffer channel for: ${serviceType}`); return null; }
 
-  const schedTs = Math.floor(new Date(scheduledAt).getTime() / 1000);
-  const params = new URLSearchParams({
-    access_token: BUFFER_TOKEN,
-    profile_ids: profile.id,
-    text,
-    scheduled_at: String(schedTs),
-    now: 'false',
-    top: 'false',
+  const body = JSON.stringify({
+    query: `mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { post { id } errors { message } } }`,
+    variables: {
+      input: {
+        channelId,
+        text,
+        scheduledAt: new Date(scheduledAt).toISOString(),
+        status: 'scheduled',
+      },
+    },
   });
-  const body = params.toString();
-  return request('https://api.bufferapp.com/1/updates/create.json', {
+
+  const resp = await request('https://api.buffer.com/graphql', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${BUFFER_TOKEN}`,
+      'Content-Length': Buffer.byteLength(body),
+    },
     body,
   });
+
+  if (resp?.errors) console.error(`Buffer ${serviceType} error:`, JSON.stringify(resp.errors));
+  else console.log(`Buffer ${serviceType} scheduled:`, resp?.data?.createPost?.post?.id);
+  return resp;
 }
 
 // ── PIPELINE CHECK ────────────────────────────────────────────────────────────
