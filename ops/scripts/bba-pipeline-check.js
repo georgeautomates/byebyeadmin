@@ -41,11 +41,12 @@ const ANTHROPIC_KEY  = process.env.ANTHROPIC_API_KEY;
 const SLACK_TOKEN    = process.env.SLACK_BOT_TOKEN;
 const OPENAI_KEY     = process.env.OPENAI_API_KEY;
 const BUFFER_TOKEN   = process.env.BUFFER_TOKEN;
-const GCP_CLIENT_ID  = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
-const GCP_SECRET     = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
-const GCP_REFRESH    = process.env.GOOGLE_DRIVE_REFRESH_TOKEN || process.env.GOOGLE_REFRESH_TOKEN;
-const SHEET_ID       = process.env.GOOGLE_CONTENT_SHEET_ID;
-const DRIVE_FOLDER   = process.env.GOOGLE_DRIVE_FOLDER_ID;
+const GCP_CLIENT_ID     = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
+const GCP_SECRET        = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
+const DRIVE_REFRESH     = process.env.GOOGLE_DRIVE_REFRESH_TOKEN; // drive.readonly scope
+const SHEETS_REFRESH    = process.env.GOOGLE_REFRESH_TOKEN;       // spreadsheets scope
+const SHEET_ID          = process.env.GOOGLE_CONTENT_SHEET_ID;
+const DRIVE_FOLDER      = process.env.GOOGLE_DRIVE_FOLDER_ID;
 
 // ── http helpers ──────────────────────────────────────────────────────────────
 
@@ -102,13 +103,15 @@ async function postForm(url, data) {
 
 // ── GCP token ─────────────────────────────────────────────────────────────────
 
-async function getGcpToken() {
+async function getGcpToken(refreshToken) {
   const resp = await postForm('https://oauth2.googleapis.com/token', {
     client_id: GCP_CLIENT_ID, client_secret: GCP_SECRET,
-    refresh_token: GCP_REFRESH, grant_type: 'refresh_token',
+    refresh_token: refreshToken, grant_type: 'refresh_token',
   });
   return resp.access_token || '';
 }
+async function getDriveToken()  { return getGcpToken(DRIVE_REFRESH); }
+async function getSheetsToken() { return getGcpToken(SHEETS_REFRESH); }
 
 // ── Slack ─────────────────────────────────────────────────────────────────────
 
@@ -249,11 +252,13 @@ async function bufferPost(serviceType, text, scheduledAt) {
 
 async function runCheck() {
   console.log('Pipeline check starting...');
-  const token = await getGcpToken();
-  if (!token) { console.error('No GCP token'); return; }
+  const sheetsToken = await getSheetsToken();
+  const driveToken  = await getDriveToken();
+  if (!sheetsToken) { console.error('No Sheets token'); return; }
+  if (!driveToken)  { console.error('No Drive token'); return; }
 
   // 1. Check for pending approvals
-  const pending = await getPendingApprovals(token);
+  const pending = await getPendingApprovals(sheetsToken);
   const awaiting = pending.find(r => r.data[COL.status] === 'awaiting');
   if (awaiting) {
     console.log('Pending approval found — skipping check.');
@@ -264,7 +269,7 @@ async function runCheck() {
   console.log('Scanning Drive folder...');
   const driveResp = await getJson(
     `https://www.googleapis.com/drive/v3/files?q='${DRIVE_FOLDER}'+in+parents+and+trashed=false&fields=files(id,name,createdTime,mimeType)&orderBy=createdTime&pageSize=50`,
-    { Authorization: `Bearer ${token}` }
+    { Authorization: `Bearer ${driveToken}` }
   );
   const allFiles = driveResp.files || [];
   const videoFiles = allFiles.filter(f =>
@@ -272,7 +277,7 @@ async function runCheck() {
   );
 
   // 3. Get processed IDs
-  const processedData = await sheetsGet(token, 'Processed Videos!A:E');
+  const processedData = await sheetsGet(sheetsToken, 'Processed Videos!A:E');
   const processedIds = new Set((processedData.values || []).slice(1).map(r => r[0]).filter(Boolean));
 
   // 4. Pick oldest unprocessed
@@ -291,7 +296,7 @@ async function runCheck() {
   console.log(`Downloading to ${tmpVideo}...`);
   execSync(
     `curl -s -L "https://www.googleapis.com/drive/v3/files/${video.id}?alt=media" ` +
-    `-H "Authorization: Bearer ${token}" -o "${tmpVideo}"`,
+    `-H "Authorization: Bearer ${driveToken}" -o "${tmpVideo}"`,
     { stdio: 'pipe' }
   );
 
@@ -370,7 +375,7 @@ Rules:
   // 9. Write to Pending Approvals
   const runId = `${video.name.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 40)}-${Date.now()}`;
   const schedDate = scheduleDate();
-  await sheetsAppend(token, 'Pending Approvals!A:M', [[
+  await sheetsAppend(sheetsToken, 'Pending Approvals!A:M', [[
     runId, video.name, video.id, schedDate,
     title_1, title_2, title_3, ig_1, ig_2, linkedin, yt_description,
     transcript.slice(0, 5000), 'awaiting',
@@ -405,8 +410,8 @@ Rules:
 
 async function runApproval(approvalStr, runId = null) {
   console.log(`Processing approval: "${approvalStr}"`);
-  const token = await getGcpToken();
-  if (!token) { console.error('No GCP token'); return; }
+  const token = await getSheetsToken();
+  if (!token) { console.error('No Sheets token'); return; }
 
   // Parse "title 2, ig 1" or "title 2, ig 1, li"
   const titleMatch = approvalStr.match(/title\s+(\d)/i);
@@ -470,7 +475,7 @@ async function runApproval(approvalStr, runId = null) {
 
 async function runSkip(runId = null) {
   console.log('Processing skip...');
-  const token = await getGcpToken();
+  const token = await getSheetsToken();
   if (!token) return;
 
   const rows = await getPendingApprovals(token);
