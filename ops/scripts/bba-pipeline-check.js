@@ -384,6 +384,7 @@ Rules:
     '',
     'Reply: `title [n], ig [n]` (add `, li` for LinkedIn)',
     `_run_id: ${runId}_`,
+    `<https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit|View in Google Sheets>`,
   ].join('\n');
 
   await slackDm(msg);
