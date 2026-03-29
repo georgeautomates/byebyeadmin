@@ -217,7 +217,7 @@ const BUFFER_CHANNELS = {
   linkedin:  null, // not connected
 };
 
-async function bufferPost(serviceType, text, scheduledAt, videoUrl = null) {
+async function bufferPost(serviceType, text, scheduledAt, videoUrl = null, platformMeta = null) {
   const channelId = BUFFER_CHANNELS[serviceType.toLowerCase()];
   if (!channelId) { console.error(`No Buffer channel for: ${serviceType}`); return null; }
 
@@ -229,6 +229,10 @@ async function bufferPost(serviceType, text, scheduledAt, videoUrl = null) {
     mode: 'customScheduled',
   };
   if (videoUrl) input.assets = { videos: [{ url: videoUrl }] };
+  if (platformMeta) {
+    if (serviceType === 'youtube') input.metadata = { youtube: { categoryId: platformMeta.categoryId || '22', title: platformMeta.title, notifySubscribers: true, embeddable: true, madeForKids: false } };
+    if (serviceType === 'instagram') input.metadata = { instagram: { type: platformMeta.type || 'reel', shouldShareToFeed: platformMeta.shouldShareToFeed ?? true } };
+  }
 
   const body = JSON.stringify({
     query: `mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } } }`,
@@ -473,9 +477,8 @@ async function runApproval(approvalStr, runId = null) {
 
   // Post to Buffer
   console.log('Posting to Buffer...');
-  const ytText = `${chosenTitle}\n\n${ytDesc}`;
-  await bufferPost('youtube', ytText, schedDate, videoUrl);
-  await bufferPost('instagram', chosenIg, schedDate, videoUrl);
+  await bufferPost('youtube', ytDesc, schedDate, videoUrl, { title: chosenTitle, categoryId: '22' });
+  await bufferPost('instagram', chosenIg, schedDate, videoUrl, { type: 'reel', shouldShareToFeed: true });
   if (wantLi && chosenLi) await bufferPost('linkedin', chosenLi, schedDate);
 
   // Give Buffer 30s to fetch the video, then clean up
