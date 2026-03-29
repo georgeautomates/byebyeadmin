@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""BBA Hot Lead Monitor — runs every 2h on VPS.
-Checks Instantly for new replies in last 2h. Classifies each as HOT/WARM/COLD via Claude Haiku.
-Alerts George on Slack if any hot leads found. Logs all to Google Sheets.
+"""BBA Hot Lead Monitor — runs every 4h on VPS.
+Checks Instantly for new replies in last 4h. Classifies each as HOT/WARM/COLD via Claude Haiku.
+HOT = explicit positive OR implied interest (fleet context, operational questions, pricing curiosity).
+Alerts George on Slack only if HOT leads found. Logs only HOT leads to Google Sheets.
+Silent midnight-6am UTC. Fat context: checks Sheets history to avoid duplicate alerts.
 """
 
-import os, json, sys, datetime
+import os, json, sys, datetime, re
 import urllib.request, urllib.parse
 
 def load_env():
@@ -19,6 +21,13 @@ def load_env():
                 os.environ.setdefault(key.strip(), val.strip().strip('"').strip("'"))
 
 load_env()
+
+# ── silence window ─────────────────────────────────────────────────────────────
+
+now = datetime.datetime.utcnow()
+if now.hour < 6:
+    print(f'Silence window (UTC {now.hour}:00 — runs 06:00-23:59 UTC). Exiting.')
+    sys.exit(0)
 
 GEORGE                 = 'U0AETR5UK4Y'
 ANTHROPIC_KEY          = os.environ.get('ANTHROPIC_API_KEY', '')
@@ -71,8 +80,8 @@ def post_form(url, data):
         print(f'  POST form failed: {e}', file=sys.stderr)
         return {}
 
-def call_llm(prompt, max_tokens=400):
-    """Anthropic → Gemini → OpenAI cascade."""
+def call_llm(prompt, max_tokens=500):
+    """Anthropic Haiku → Gemini → OpenAI cascade."""
     if ANTHROPIC_KEY:
         body = json.dumps({'model': 'claude-haiku-4-5-20251001', 'max_tokens': max_tokens,
             'messages': [{'role': 'user', 'content': prompt}]}).encode()
@@ -112,19 +121,47 @@ def call_llm(prompt, max_tokens=400):
         print(f'  OpenAI failed: {e}', file=sys.stderr)
         return ''
 
-# ── 1. Fetch replies from last 2h ─────────────────────────────────────────────
-
-now      = datetime.datetime.utcnow()
-two_h_ago = (now - datetime.timedelta(hours=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
 today_str = now.strftime('%Y-%m-%d %H:%M')
 
-print(f'Fetching Instantly replies since {two_h_ago}...')
+# ── 1. Get fat context: already-alerted emails from Sheets ───────────────────
+
+gcp_token = ''
+already_alerted = set()  # set of email addresses already logged as HOT
+
+if GCP_REFRESH and SHEET_ID:
+    print('Getting GCP token...')
+    token_resp = post_form('https://oauth2.googleapis.com/token', {
+        'client_id': GCP_CLIENT_ID, 'client_secret': GCP_SECRET,
+        'refresh_token': GCP_REFRESH, 'grant_type': 'refresh_token',
+    })
+    gcp_token = token_resp.get('access_token', '')
+
+if gcp_token and SHEET_ID:
+    try:
+        url = (f'https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}'
+               f'/values/Hot%20Leads!A:H')
+        req = urllib.request.Request(url, headers={'Authorization': f'Bearer {gcp_token}'})
+        resp = json.loads(urllib.request.urlopen(req, timeout=15).read())
+        rows = resp.get('values', [])
+        # Last 5 HOT rows per email — just collect all emailed addresses from last 50 rows
+        for row in rows[-50:]:
+            if len(row) >= 4:
+                already_alerted.add(row[3].lower().strip())  # col D = sender_email
+        print(f'  Loaded {len(already_alerted)} previously-alerted emails from Sheets.')
+    except Exception as e:
+        print(f'  Could not load Sheets history: {e}', file=sys.stderr)
+
+# ── 2. Fetch replies from last 4h ─────────────────────────────────────────────
+
+four_h_ago = (now - datetime.timedelta(hours=4)).strftime('%Y-%m-%dT%H:%M:%SZ')
+print(f'Fetching Instantly replies since {four_h_ago}...')
+
 auth = {'Authorization': f'Bearer {INSTANTLY_KEY}'}
 replies = []
 starting_after = None
 
 while len(replies) < 50:
-    qs = f'limit=100&ue_type=3&timestamp_after={urllib.parse.quote(two_h_ago)}'
+    qs = f'limit=100&ue_type=3&timestamp_after={urllib.parse.quote(four_h_ago)}'
     if starting_after:
         qs += f'&starting_after={urllib.parse.quote(starting_after)}'
     page = get(f'https://api.instantly.ai/api/v2/emails?{qs}', auth)
@@ -137,109 +174,148 @@ while len(replies) < 50:
         break
     starting_after = page['next_starting_after']
 
-print(f'Found {len(replies)} replies in last 2h.')
+print(f'Found {len(replies)} replies in last 4h.')
 
 if not replies:
     print('No new replies — nothing to do.')
     sys.exit(0)
 
-# ── 2. Classify replies ────────────────────────────────────────────────────────
+# ── 3. Classify replies ────────────────────────────────────────────────────────
 
-def build_classify_prompt(batch):
+def extract_addr(to_addr):
+    if isinstance(to_addr, dict):
+        return (
+            to_addr.get('name', '') or '',
+            to_addr.get('email', '') or '',
+            to_addr.get('company', '') or ''
+        )
+    s = str(to_addr or '')
+    return '', s, ''
+
+def build_batch_prompt(batch):
     lines = []
     for i, r in enumerate(batch):
-        name    = r.get('to_address', {}).get('name', '') or r.get('to_address', '') or 'Unknown'
-        email   = r.get('to_address', {}).get('email', '') or ''
-        company = r.get('to_address', {}).get('company', '') or ''
-        body    = (r.get('body', '') or r.get('text', '') or '')[:300]
-        lines.append(f'Reply {i+1}: From: {name} ({company}) <{email}>\nBody: {body}')
+        name, email, company = extract_addr(r.get('to_address'))
+        body = (r.get('body', '') or r.get('text', '') or '')[:300]
+        campaign = r.get('campaign_name', r.get('campaign_id', 'unknown'))
+        lines.append(
+            f'Reply {i+1}:\n'
+            f'Sender: {name} ({company}) <{email}>\n'
+            f'Campaign: {campaign}\n'
+            f'Body: {body}'
+        )
+
     prompt = (
-        'You are classifying cold email replies for ByeByeAdmin (AI automation for UK haulage fleets).\n\n'
-        'HOT = interested, asking questions, wants a demo/call/price, positive intent\n'
-        'WARM = not now, maybe later, or ambiguous\n'
-        'COLD = unsubscribe, not interested, negative, out of office\n\n'
-        'For each reply output ONE line (no extra text):\n'
-        'REPLY_N | CLASSIFICATION | REASON (max 10 words) | SUGGESTED_REPLY (max 15 words)\n\n'
+        'Classify these cold email replies for ByeByeAdmin (AI admin automation for UK haulage fleets — reduces paperwork, proof of delivery, compliance docs).\n\n'
+        'HOT = any positive or implied interest, including:\n'
+        '  - Explicit: "yes", "interested", "how much", "send more info", "book a call", "sounds good"\n'
+        '  - Implied: mentions their fleet size/operations, asks how it works, mentions a pain point (admin, paperwork, compliance), asks about timing or implementation\n'
+        '  - Context: "we run 12 vehicles", "our drivers spend hours on PODs", "we use X software currently"\n'
+        'WARM = not now, maybe later, ambiguous, asking to try again in future\n'
+        'COLD = unsubscribe, not interested, wrong person, out of office, negative\n\n'
+        'Return a JSON array, one object per reply, in order:\n'
+        '[{"idx":1,"classification":"HOT","reason":"asked about pricing","suggested_reply":"Thanks for getting back to me — happy to walk you through exactly how it works for fleets your size. When works for a quick call?"},{"idx":2,...},...]\n\n'
+        'suggested_reply: a natural 1-2 sentence reply George can send (only for HOT; empty string for WARM/COLD).\n'
+        'Return ONLY the JSON array.\n\n'
         'Replies:\n' + '\n\n'.join(lines)
     )
     return prompt
 
-BATCH_SIZE = 5
+BATCH_SIZE = 8
 classified = []
 
 for i in range(0, len(replies), BATCH_SIZE):
     batch = replies[i:i + BATCH_SIZE]
-    prompt = build_classify_prompt(batch)
-    result = call_llm(prompt, max_tokens=500)
+    prompt = build_batch_prompt(batch)
+    result = call_llm(prompt, max_tokens=600)
     if not result:
         for r in batch:
             classified.append({**r, 'classification': 'UNKNOWN', 'reason': '', 'suggested': ''})
         continue
-    lines = [l.strip() for l in result.strip().splitlines() if '|' in l]
-    for j, r in enumerate(batch):
-        match = next((l for l in lines if l.startswith(f'REPLY_{j+1}')), None)
-        if match:
-            parts = [p.strip() for p in match.split('|')]
-            classified.append({
-                **r,
-                'classification': parts[1] if len(parts) > 1 else 'UNKNOWN',
-                'reason':         parts[2] if len(parts) > 2 else '',
-                'suggested':      parts[3] if len(parts) > 3 else '',
-            })
-        else:
+    # Parse JSON
+    try:
+        clean = re.sub(r'^```(?:json)?\s*|\s*```$', '', result.strip(), flags=re.MULTILINE)
+        parsed = json.loads(clean)
+        for j, r in enumerate(batch):
+            item = next((p for p in parsed if p.get('idx') == j + 1), None)
+            if item:
+                classified.append({
+                    **r,
+                    'classification': item.get('classification', 'UNKNOWN'),
+                    'reason':         item.get('reason', ''),
+                    'suggested':      item.get('suggested_reply', ''),
+                })
+            else:
+                classified.append({**r, 'classification': 'UNKNOWN', 'reason': '', 'suggested': ''})
+    except Exception as e:
+        print(f'  JSON parse failed: {e} — marking batch as UNKNOWN', file=sys.stderr)
+        for r in batch:
             classified.append({**r, 'classification': 'UNKNOWN', 'reason': '', 'suggested': ''})
 
-# ── 3. Log to Google Sheet ─────────────────────────────────────────────────────
+hot = [r for r in classified if r.get('classification') == 'HOT']
+warm = [r for r in classified if r.get('classification') == 'WARM']
+cold = [r for r in classified if r.get('classification') == 'COLD']
+print(f'HOT: {len(hot)} / WARM: {len(warm)} / COLD: {len(cold)}')
 
-gcp_token = ''
-if GCP_REFRESH and SHEET_ID:
-    print('Getting GCP token...')
-    token_resp = post_form('https://oauth2.googleapis.com/token', {
-        'client_id': GCP_CLIENT_ID, 'client_secret': GCP_SECRET,
-        'refresh_token': GCP_REFRESH, 'grant_type': 'refresh_token',
-    })
-    gcp_token = token_resp.get('access_token', '')
+# ── 4. Deduplicate: filter HOT leads already alerted ─────────────────────────
 
-if gcp_token and SHEET_ID and classified:
-    print(f'Logging {len(classified)} replies to sheet...')
+new_hot = []
+for r in hot:
+    _, email, _ = extract_addr(r.get('to_address'))
+    if email.lower().strip() not in already_alerted:
+        new_hot.append(r)
+
+skipped = len(hot) - len(new_hot)
+if skipped:
+    print(f'  Skipped {skipped} HOT leads already logged in Sheets.')
+
+if not new_hot:
+    print('No new HOT leads — no Slack alert needed.')
+    sys.exit(0)
+
+# ── 5. Log HOT leads to Sheets ────────────────────────────────────────────────
+
+if gcp_token and SHEET_ID:
+    print(f'Logging {len(new_hot)} HOT leads to sheet...')
     rows = []
-    for r in classified:
-        name  = r.get('to_address', {}).get('name', '') if isinstance(r.get('to_address'), dict) else str(r.get('to_address', ''))
-        email = r.get('to_address', {}).get('email', '') if isinstance(r.get('to_address'), dict) else ''
-        company = r.get('to_address', {}).get('company', '') if isinstance(r.get('to_address'), dict) else ''
-        body  = (r.get('body', '') or r.get('text', '') or '')[:200]
-        rows.append([today_str, name, email, company, r['classification'], body[:150], r['reason'], r['suggested']])
+    for r in new_hot:
+        name, email, company = extract_addr(r.get('to_address'))
+        campaign = r.get('campaign_name', r.get('campaign_id', ''))
+        snippet = (r.get('body', '') or r.get('text', '') or '')[:200]
+        rows.append([today_str, campaign, name, email, company, snippet[:150], r['classification'], r.get('suggested', ''), 'TRUE'])
     post_json(
         f'https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}'
-        f'/values/Hot%20Leads!A:H:append?valueInputOption=USER_ENTERED',
+        f'/values/Hot%20Leads!A:I:append?valueInputOption=USER_ENTERED',
         {'values': rows},
         {'Authorization': f'Bearer {gcp_token}'}
     )
+    print('  Logged to Hot Leads sheet.')
 
-# ── 4. Alert on hot leads ──────────────────────────────────────────────────────
+# ── 6. Alert George on Slack ──────────────────────────────────────────────────
 
-hot = [r for r in classified if r.get('classification') == 'HOT']
-print(f'Hot: {len(hot)} / Warm: {len([r for r in classified if r.get("classification") == "WARM"])} / Cold: {len([r for r in classified if r.get("classification") == "COLD"])}')
+parts = [f':fire: *{len(new_hot)} HOT lead{"s" if len(new_hot) > 1 else ""} — {today_str} UTC*\n']
+for r in new_hot:
+    name, email, company = extract_addr(r.get('to_address'))
+    campaign = r.get('campaign_name', r.get('campaign_id', ''))
+    snippet = (r.get('body', '') or r.get('text', '') or '')[:130].strip()
+    suggested = r.get('suggested', '').strip()
 
-if not hot:
-    print('No hot leads — no Slack alert needed.')
-    sys.exit(0)
+    label = f'*{name}*' if name else f'*{email}*'
+    if company:
+        label += f' ({company})'
 
-lines = [f':fire: *{len(hot)} hot lead{"s" if len(hot) > 1 else ""} — {today_str} UTC*\n']
-for r in hot:
-    name    = r.get('to_address', {}).get('name', '') if isinstance(r.get('to_address'), dict) else str(r.get('to_address', ''))
-    email   = r.get('to_address', {}).get('email', '') if isinstance(r.get('to_address'), dict) else ''
-    company = r.get('to_address', {}).get('company', '') if isinstance(r.get('to_address'), dict) else ''
-    body    = (r.get('body', '') or r.get('text', '') or '')[:120]
-    lines.append(
-        f'*{name}* ({company}) <{email}>\n'
-        f'_{body.strip()}_\n'
-        f'Reply: _{r.get("suggested", "")}_\n'
+    block = (
+        f':fire: *HOT lead — {label}*\n'
+        f'Campaign: {campaign}\n'
+        f'_{snippet}_\n'
     )
+    if suggested:
+        block += f'Suggested reply: _{suggested}_\n'
+    parts.append(block)
 
-msg = '\n'.join(lines)
+msg = '\n'.join(parts)
 if len(msg) > 3800:
-    msg = msg[:3750] + '\n_[truncated]_'
+    msg = msg[:3750] + '\n_[truncated — see Hot Leads sheet]_'
 
 print('Posting hot lead alert to Slack...')
 result = post_json(
@@ -248,7 +324,7 @@ result = post_json(
     {'Authorization': f'Bearer {SLACK_TOKEN}'}
 )
 if result.get('ok'):
-    print(f'Hot lead alert sent ({len(hot)} leads).')
+    print(f'Alert sent: {len(new_hot)} new HOT leads.')
 else:
     print(f'Slack error: {result}', file=sys.stderr)
     sys.exit(1)

@@ -46,6 +46,7 @@ AGENT_IDS = {
     'blog-writer':        os.environ.get('PAPERCLIP_AGENT_BLOG_WRITER', ''),
     'campaign-builder':   os.environ.get('PAPERCLIP_AGENT_CAMPAIGN_BUILDER', ''),
     'ceo-brief':          os.environ.get('PAPERCLIP_AGENT_CEO_BRIEF', ''),
+    'copywriter':         os.environ.get('PAPERCLIP_AGENT_COPYWRITER', ''),
 }
 
 def paperclip_post(path, data):
@@ -100,9 +101,10 @@ AGENTS = {
     'website-review':     ['python3', f'{SCRIPTS}/bba-website-review.py'],
     'hot-lead-monitor':   ['python3', f'{SCRIPTS}/bba-hot-leads.py'],
     'content-strategist': ['python3', f'{SCRIPTS}/bba-content-strategist.py'],
-    'blog-writer':        ['python3', f'{SCRIPTS}/bba-blog-writer.py', '--topic', 'scheduled run'],
+    'blog-writer':        ['python3', f'{SCRIPTS}/bba-blog-writer.py', '--mode', 'full'],
     'campaign-builder':   ['python3', f'{SCRIPTS}/bba-campaign-builder.py', '--segment', 'scheduled run'],
     'ceo-brief':          ['python3', f'{SCRIPTS}/bba-ceo-brief.py'],
+    'copywriter':         ['python3', f'{SCRIPTS}/bba-copywriter.py', '--source', 'pipeline'],
 }
 
 # ── HTTP handler ───────────────────────────────────────────────────────────────

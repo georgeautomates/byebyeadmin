@@ -110,24 +110,52 @@ app.message(async ({ message, say, client }) => {
         if (err) console.error('Pipeline approval error:', stderr);
         else console.log('Pipeline approval:', stdout);
       });
+      // Trigger Copywriter brand voice audit after approval
+      const copywriterPath = '/home/openclaw/byebyeadmin/ops/scripts/bba-copywriter.py';
+      exec(`python3 ${copywriterPath} --source pipeline`, (err) => {
+        if (err) console.error('Copywriter audit error:', err.message);
+      });
     }
     await say({ text: 'On it...', thread_ts: message.ts });
     return;
   }
 
-  // --- blog: [topic]: trigger blog writer ---
+  // --- blog: [topic]: generate outline first (two-stage flow) ---
   const blogMatch = text.match(/^blog:\s*(.+)/i);
   if (blogMatch) {
-    await say({ text: ':memo: Writing blog post... (2-3 min)', thread_ts: message.ts });
+    await say({ text: ':memo: Researching + generating outline... (1-2 min)', thread_ts: message.ts });
     const scriptPath = '/home/openclaw/byebyeadmin/ops/scripts/bba-blog-writer.py';
-    exec(`python3 ${scriptPath} --topic ${JSON.stringify(blogMatch[1])}`, (err, stdout, stderr) => {
-      if (err) console.error('Blog writer error:', stderr);
-      else console.log('Blog writer done:', stdout.substring(0, 200));
+    exec(`python3 ${scriptPath} --mode outline --topic ${JSON.stringify(blogMatch[1])}`, (err, stdout, stderr) => {
+      if (err) console.error('Blog outline error:', stderr);
+      else console.log('Blog outline done:', stdout.substring(0, 200));
     });
     return;
   }
 
-  // --- campaign: [segment]: trigger campaign builder ---
+  // --- blog ok: write + publish full post from pending outline ---
+  if (/^blog ok$/i.test(text)) {
+    await say({ text: ':writing_hand: Writing full post + publishing... (2-4 min)', thread_ts: message.ts });
+    const scriptPath = '/home/openclaw/byebyeadmin/ops/scripts/bba-blog-writer.py';
+    exec(`python3 ${scriptPath} --mode full`, (err, stdout, stderr) => {
+      if (err) console.error('Blog full write error:', stderr);
+      else console.log('Blog full write done:', stdout.substring(0, 200));
+    });
+    return;
+  }
+
+  // --- approve campaign: [segment]: create draft in Instantly ---
+  const approveCampaignMatch = text.match(/^approve campaign:\s*(.+)/i);
+  if (approveCampaignMatch) {
+    await say({ text: ':white_check_mark: Creating in Instantly (draft, not launched)...', thread_ts: message.ts });
+    const scriptPath = '/home/openclaw/byebyeadmin/ops/scripts/bba-campaign-builder.py';
+    exec(`python3 ${scriptPath} --approve ${JSON.stringify(approveCampaignMatch[1])}`, (err, stdout, stderr) => {
+      if (err) console.error('Campaign approve error:', stderr);
+      else console.log('Campaign approve done:', stdout.substring(0, 200));
+    });
+    return;
+  }
+
+  // --- campaign: [segment]: build sequence ---
   const campaignMatch = text.match(/^campaign:\s*(.+)/i);
   if (campaignMatch) {
     await say({ text: ':email: Building campaign sequence... (1-2 min)', thread_ts: message.ts });
