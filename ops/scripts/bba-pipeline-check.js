@@ -228,7 +228,6 @@ async function bufferPost(serviceType, text, scheduledAt, videoUrl = null, platf
     dueAt: new Date(scheduledAt).toISOString(),
     schedulingType: 'automatic',
     mode: 'customScheduled',
-    saveToDraft: true,
   };
   if (videoUrl) input.assets = { videos: [{ url: videoUrl }] };
   if (platformMeta) {
@@ -253,7 +252,7 @@ async function bufferPost(serviceType, text, scheduledAt, videoUrl = null, platf
 
   const postId = resp?.data?.createPost?.post?.id;
   if (resp?.errors || !postId) console.error(`Buffer ${serviceType} error:`, JSON.stringify(resp?.errors || resp?.data?.createPost));
-  else console.log(`Buffer ${serviceType} drafted:`, postId);
+  else console.log(`Buffer ${serviceType} scheduled:`, postId);
   return resp;
 }
 
@@ -489,13 +488,13 @@ async function runApproval(approvalStr, runId = null) {
   await new Promise(resolve => setTimeout(resolve, 800));
   console.log(`Serving video at ${videoUrl}`);
 
-  // Create Buffer drafts
-  console.log('Creating Buffer drafts...');
+  // Schedule posts in Buffer
+  console.log('Scheduling Buffer posts...');
   await bufferPost('youtube', ytDesc, schedDate, videoUrl, { title: chosenTitle, categoryId: '22' });
   await bufferPost('instagram', chosenIg, schedDate, videoUrl, { type: 'reel', shouldShareToFeed: true });
   if (wantLi && chosenLi) await bufferPost('linkedin', chosenLi, schedDate);
 
-  console.log('Buffer drafts created. Video server running for 48h.');
+  console.log('Buffer posts scheduled. Video server running for 48h.');
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -511,9 +510,9 @@ async function runApproval(approvalStr, runId = null) {
 
   // Confirm to Slack
   await slackDm(
-    `:white_check_mark: *Drafted in Buffer:* ${chosenTitle}\n` +
-    `Planned for *${schedDate.slice(0, 10)}* at 10am. Review and post at <https://publish.buffer.com/|publish.buffer.com>\n` +
-    `_I'll chase you at noon on the day if it hasn't gone out._`
+    `:white_check_mark: *Scheduled in Buffer:* ${chosenTitle}\n` +
+    `Posts for YouTube + Instagram will go out on *${schedDate.slice(0, 10)}* at 10am.\n` +
+    `_I'll let you know when they're live and remind you to share to Facebook._`
   );
   console.log('Approval processed.');
 }
@@ -536,14 +535,21 @@ async function runSkip(runId = null) {
 }
 
 // ── CHASE ─────────────────────────────────────────────────────────────────────
-// Runs at noon UTC. If Buffer drafts exist for today or earlier, DM George.
+// Runs at noon UTC. Checks today's scheduled posts:
+//   - If sent: notify George they're live + remind to share to Facebook
+//   - If still pending: chase George to post
 
 async function runChase() {
   console.log('Chase check starting...');
 
   const channelIds = [BUFFER_CHANNELS.instagram, BUFFER_CHANNELS.youtube].filter(Boolean);
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setUTCHours(23, 59, 59, 999);
+
   const body = JSON.stringify({
-    query: `query GetDrafts($input: PostsInput!) {
+    query: `query GetTodayPosts($input: PostsInput!) {
       posts(input: $input) {
         edges {
           node {
@@ -561,7 +567,10 @@ async function runChase() {
     variables: {
       input: {
         organizationId: BUFFER_ORG_ID,
-        filter: { status: ['draft'], channelIds },
+        filter: {
+          channelIds,
+          dueAt: { start: todayStart.toISOString(), end: todayEnd.toISOString() },
+        },
       },
     },
   });
@@ -576,27 +585,36 @@ async function runChase() {
     body,
   });
 
-  const drafts = (resp?.data?.posts?.edges || []).map(e => e.node);
-  if (drafts.length === 0) {
-    console.log('No drafts in Buffer — nothing to chase.');
+  const posts = (resp?.data?.posts?.edges || []).map(e => e.node);
+  if (posts.length === 0) {
+    console.log('No posts scheduled for today — nothing to check.');
     return;
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const overdue = drafts.filter(d => !d.dueAt || d.dueAt.slice(0, 10) <= todayStr);
+  const sent    = posts.filter(p => p.status === 'sent');
+  const pending = posts.filter(p => p.status === 'scheduled' || p.status === 'draft');
 
-  if (overdue.length === 0) {
-    console.log('Buffer drafts exist but none due today — no chase needed.');
-    return;
+  if (sent.length > 0) {
+    const platforms = [...new Set(sent.map(p => p.channelService))].join(' + ');
+    await slackDm(
+      `:tada: *Your content is live!* (${platforms})\n` +
+      `Open your Instagram or YouTube app, go to the post, and tap *Share to Facebook* to cross-post it to your personal profile.`
+    );
+    console.log(`Notified George: ${sent.length} post(s) live today.`);
   }
 
-  const platforms = [...new Set(overdue.map(d => d.channelService))].join(' + ');
-  await slackDm(
-    `:alarm_clock: *Posting reminder:* You have ${overdue.length} draft post(s) in Buffer (${platforms}) ` +
-    `planned for today that haven\'t been published yet.\n` +
-    `<https://publish.buffer.com/|Open Buffer to review and post>`
-  );
-  console.log(`Chased George about ${overdue.length} outstanding draft(s).`);
+  if (pending.length > 0) {
+    const platforms = [...new Set(pending.map(p => p.channelService))].join(' + ');
+    await slackDm(
+      `:alarm_clock: *Posting reminder:* ${pending.length} post(s) on ${platforms} scheduled for today haven't gone out yet.\n` +
+      `<https://publish.buffer.com/|Open Buffer to check>`
+    );
+    console.log(`Chased George about ${pending.length} pending post(s).`);
+  }
+
+  if (sent.length === 0 && pending.length === 0) {
+    console.log('Posts found but none sent or pending — nothing to action.');
+  }
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
