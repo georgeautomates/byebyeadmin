@@ -38,15 +38,15 @@ AGENT_IDS = {
     'morning-brief':      '718f13c4-06a8-45cb-927c-b5222eaff473',
     'weekly-analytics':   'e919e9fa-7ce7-4a03-8413-f1ff2b0ec6ee',
     'pipeline-check':     'c3efa1b1-8abc-49e9-b06c-f28a9d3110d4',
+    'pipeline-chase':     'c3efa1b1-8abc-49e9-b06c-f28a9d3110d4',
     'content-inventory':  'afd1fb9c-721d-45b1-b2a2-67a2e965dc84',
     'website-review':     '42a0c3ff-e4fd-41ab-b40e-532cba86e0e5',
-    # New agents — IDs set after Paperclip registration on VPS
-    'hot-lead-monitor':   os.environ.get('PAPERCLIP_AGENT_HOT_LEADS', ''),
-    'content-strategist': os.environ.get('PAPERCLIP_AGENT_CONTENT_STRATEGIST', ''),
-    'blog-writer':        os.environ.get('PAPERCLIP_AGENT_BLOG_WRITER', ''),
-    'campaign-builder':   os.environ.get('PAPERCLIP_AGENT_CAMPAIGN_BUILDER', ''),
-    'ceo-brief':          os.environ.get('PAPERCLIP_AGENT_CEO_BRIEF', ''),
-    'copywriter':         os.environ.get('PAPERCLIP_AGENT_COPYWRITER', ''),
+    'hot-lead-monitor':   'f83169d0-939a-4497-bcb7-ec124ced7326',
+    'content-strategist': 'f93a9134-9e1f-4b5b-b112-9ddfa2779c7b',
+    'blog-writer':        '3bbdf6aa-8313-4250-aa60-5e1013fbfd9f',
+    'campaign-builder':   '1c478422-6aba-4dd2-a5fc-32a3ce6a8fe4',
+    'ceo-brief':          '880bc2ea-22bd-4e8d-abff-d3c8cc19a7ed',
+    'copywriter':         'a85864ef-7691-4fd4-a715-5248d3b8f356',
 }
 
 def paperclip_post(path, data):
@@ -106,6 +106,8 @@ AGENTS = {
     'campaign-builder':   ['python3', f'{SCRIPTS}/bba-campaign-builder.py', '--segment', 'scheduled run'],
     'ceo-brief':          ['python3', f'{SCRIPTS}/bba-ceo-brief.py'],
     'copywriter':         ['python3', f'{SCRIPTS}/bba-copywriter.py', '--source', 'pipeline'],
+    'cron-watchdog':      ['python3', f'{SCRIPTS}/bba-cron-watchdog.py'],
+    'chief-of-staff':     ['python3', f'{SCRIPTS}/bba-chief-of-staff.py'],
 }
 
 # ── HTTP handler ───────────────────────────────────────────────────────────────
