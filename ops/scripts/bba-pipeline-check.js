@@ -43,7 +43,7 @@ const OPENAI_KEY     = process.env.OPENAI_API_KEY;
 const BUFFER_TOKEN   = process.env.BUFFER_TOKEN;
 const GCP_CLIENT_ID  = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
 const GCP_SECRET     = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
-const GCP_REFRESH    = process.env.GOOGLE_REFRESH_TOKEN;
+const GCP_REFRESH    = process.env.GOOGLE_DRIVE_REFRESH_TOKEN || process.env.GOOGLE_REFRESH_TOKEN;
 const SHEET_ID       = process.env.GOOGLE_CONTENT_SHEET_ID;
 const DRIVE_FOLDER   = process.env.GOOGLE_DRIVE_FOLDER_ID;
 
