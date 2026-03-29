@@ -6,7 +6,7 @@ George's AI operating system for running ByeByeAdmin. Lives in `ops/` inside the
 
 **Two environments:**
 - **MacBook (Claude Code in VS Code)** — active build work, deliberate tasks
-- **Hetzner VPS** — runs the Slack router (Socket Mode listener) and 5 direct cron scripts that call APIs and post to Slack. All AI logic runs on the VPS itself via an LLM cascade (Anthropic → Gemini → OpenAI).
+- **Hetzner VPS** — runs the Slack router (Socket Mode listener) and scheduled cron scripts that call APIs and post to Slack. All AI logic runs on the VPS itself via an LLM cascade (Anthropic → Gemini → OpenAI).
 
 ## Projects
 
@@ -70,16 +70,18 @@ All scheduled AI logic runs as Python/Node.js scripts directly on the VPS. Scrip
 | `ops/scripts/bba-pipeline-check.js` | 9am + 5pm UTC daily | Drive → Whisper → Claude → Buffer content pipeline |
 | `ops/scripts/bba-content-inventory.py` | 6am UTC daily | Buffer YouTube queue alert if <3 posts; LLM video topic ideas |
 | `ops/scripts/bba-website-review.py` | 8am UTC Sunday | GA4 + Clarity weekly website report + 3 CRO tasks → Sheets |
-| `ops/scripts/bba-hot-leads.py` | Every 2h | Instantly reply monitor: classify HOT/WARM/COLD → Slack + Sheets |
-| `ops/scripts/bba-content-strategist.py` | 7am UTC Monday | YouTube + Buffer + GA4 → 5 video ideas with hooks → Slack |
-| `ops/scripts/bba-ceo-brief.py` | 10am UTC Sunday | Weekly CEO synthesis: all KPIs + strategic brief → Slack |
+| `ops/scripts/bba-hot-leads.py` | Every 4h (silence midnight-6am UTC) | Instantly reply monitor: classify HOT/WARM/COLD → Slack + Sheets (HOT only) |
+| `ops/scripts/bba-pipeline-check.js` | 12pm UTC daily (--chase) | Check Buffer for drafts due today; DM George if any not yet published |
+| `ops/scripts/bba-content-strategist.py` | 9am UTC Monday | Perplexity trends + YouTube + GA4 → 5 video ideas (2 Shorts + 3 long) with confidence scores → Slack + Sheets |
+| `ops/scripts/bba-ceo-brief.py` | 11am UTC Sunday | Weekly CEO synthesis: all KPIs + Perplexity competitor watch + agent health + momentum score → Slack |
 
 ### On-demand scripts (via Slack DM to Johnson)
 
 | Script | Trigger | Purpose |
 |--------|---------|---------|
-| `ops/scripts/bba-blog-writer.py` | `blog: [topic]` | Perplexity research + Claude Sonnet → 1,500 word blog post → Google Doc |
-| `ops/scripts/bba-campaign-builder.py` | `campaign: [segment]` | Brand context + Claude Sonnet → 5-email cold sequence → Slack for approval |
+| `ops/scripts/bba-blog-writer.py` | `blog: [topic]` → `blog ok` | Perplexity research → outline (Slack review) → 1,000 word MDX post + FAQ → git push + Vercel deploy + Copywriter audit |
+| `ops/scripts/bba-campaign-builder.py` | `campaign: [segment]` → `approve campaign: [segment]` | Variable-count email sequence (3/5/7) → Sheets → Slack approval → auto-create draft in Instantly |
+| `ops/scripts/bba-copywriter.py` | Post-approval (pipeline or blog) | Brand voice audit against voice.md → DMs George only if issues found → logs to Brand Voice Log sheet |
 
 ### VPS files
 
@@ -96,9 +98,10 @@ agents/archive/          — old remote trigger implementations (reference only)
 0 9,17 * * *  /home/openclaw/.nvm/versions/node/v22.22.1/bin/node /home/openclaw/byebyeadmin/ops/scripts/bba-pipeline-check.js --check >> ~/.openclaw/cron.log 2>&1
 0 6 * * *     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-content-inventory.py >> ~/.openclaw/cron.log 2>&1
 0 8 * * 0     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-website-review.py >> ~/.openclaw/cron.log 2>&1
-0 */2 * * *   python3 /home/openclaw/byebyeadmin/ops/scripts/bba-hot-leads.py >> ~/.openclaw/cron.log 2>&1
-0 7 * * 1     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-content-strategist.py >> ~/.openclaw/cron.log 2>&1
-0 10 * * 0    python3 /home/openclaw/byebyeadmin/ops/scripts/bba-ceo-brief.py >> ~/.openclaw/cron.log 2>&1
+0 */4 * * *   python3 /home/openclaw/byebyeadmin/ops/scripts/bba-hot-leads.py >> ~/.openclaw/cron.log 2>&1
+0 12 * * *    /home/openclaw/.nvm/versions/node/v22.22.1/bin/node /home/openclaw/byebyeadmin/ops/scripts/bba-pipeline-check.js --chase >> ~/.openclaw/cron.log 2>&1
+0 9 * * 1     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-content-strategist.py >> ~/.openclaw/cron.log 2>&1
+0 11 * * 0    python3 /home/openclaw/byebyeadmin/ops/scripts/bba-ceo-brief.py >> ~/.openclaw/cron.log 2>&1
 ```
 
 Logs: `tail -f ~/.openclaw/cron.log` on VPS.

@@ -97,6 +97,7 @@ AGENTS = {
     'morning-brief':      ['python3', f'{SCRIPTS}/bba-morning-briefing.py'],
     'weekly-analytics':   ['python3', f'{SCRIPTS}/bba-weekly-analytics.py'],
     'pipeline-check':     [NODE,      f'{SCRIPTS}/bba-pipeline-check.js', '--check'],
+    'pipeline-chase':     [NODE,      f'{SCRIPTS}/bba-pipeline-check.js', '--chase'],
     'content-inventory':  ['python3', f'{SCRIPTS}/bba-content-inventory.py'],
     'website-review':     ['python3', f'{SCRIPTS}/bba-website-review.py'],
     'hot-lead-monitor':   ['python3', f'{SCRIPTS}/bba-hot-leads.py'],

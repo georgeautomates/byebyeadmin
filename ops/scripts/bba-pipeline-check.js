@@ -12,7 +12,7 @@
 
 import https from 'https';
 import http from 'http';
-import { execSync, exec } from 'child_process';
+import { execSync, exec, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -216,6 +216,7 @@ const BUFFER_CHANNELS = {
   youtube:   '69b7df3d7be9f8b1715f313c',
   linkedin:  null, // not connected
 };
+const BUFFER_ORG_ID = '69b7dc8e9ab93fdee82b1f6e';
 
 async function bufferPost(serviceType, text, scheduledAt, videoUrl = null, platformMeta = null) {
   const channelId = BUFFER_CHANNELS[serviceType.toLowerCase()];
@@ -227,6 +228,7 @@ async function bufferPost(serviceType, text, scheduledAt, videoUrl = null, platf
     dueAt: new Date(scheduledAt).toISOString(),
     schedulingType: 'automatic',
     mode: 'customScheduled',
+    saveToDraft: true,
   };
   if (videoUrl) input.assets = { videos: [{ url: videoUrl }] };
   if (platformMeta) {
@@ -235,7 +237,7 @@ async function bufferPost(serviceType, text, scheduledAt, videoUrl = null, platf
   }
 
   const body = JSON.stringify({
-    query: `mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } } }`,
+    query: `mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id status } } ... on InvalidInputError { message } ... on UnexpectedError { message } ... on RestProxyError { message } } }`,
     variables: { input },
   });
 
@@ -250,8 +252,8 @@ async function bufferPost(serviceType, text, scheduledAt, videoUrl = null, platf
   });
 
   const postId = resp?.data?.createPost?.post?.id;
-  if (resp?.errors || !postId) console.error(`Buffer ${serviceType} error:`, JSON.stringify(resp?.errors || resp));
-  else console.log(`Buffer ${serviceType} scheduled:`, postId);
+  if (resp?.errors || !postId) console.error(`Buffer ${serviceType} error:`, JSON.stringify(resp?.errors || resp?.data?.createPost));
+  else console.log(`Buffer ${serviceType} drafted:`, postId);
   return resp;
 }
 
@@ -405,6 +407,7 @@ Rules:
     `2. ${ig_2.slice(0, 400)}${ig_2.length > 400 ? '...' : ''}`,
     '',
     'Reply: `title [n], ig [n]` (add `, li` for LinkedIn)',
+    `_Once you reply I\'ll create drafts in Buffer ready to post._`,
     `_run_id: ${runId}_`,
     `<https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit|View in Google Sheets>`,
   ].join('\n');
@@ -454,7 +457,7 @@ async function runApproval(approvalStr, runId = null) {
   const transcript  = d[COL.transcript] || '';
   const rowRunId    = d[COL.run_id];
 
-  // Download video from Drive to serve temporarily for Buffer upload
+  // Download video from Drive to serve for Buffer upload
   console.log('Downloading video for Buffer...');
   const driveToken = await getDriveToken();
   const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -465,27 +468,34 @@ async function runApproval(approvalStr, runId = null) {
     { stdio: 'pipe' }
   );
 
-  // Serve video temporarily on port 8766
+  // Kill any existing server on port 8766, then start a background server (48h auto-stop)
   const videoUrl = `http://178.104.12.113:8766/${safeFilename}`;
-  const tmpServer = http.createServer((req, res) => {
-    const stream = fs.createReadStream(tmpVideoPath);
-    res.setHeader('Content-Type', 'video/mp4');
-    stream.pipe(res);
-  });
-  await new Promise(resolve => tmpServer.listen(8766, resolve));
+  try { execSync('fuser -k 8766/tcp 2>/dev/null || true', { stdio: 'pipe' }); } catch {}
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  const serverScript = `
+    const http=require('http'),fs=require('fs');
+    const server=http.createServer((req,res)=>{
+      const f='/tmp/'+require('path').basename(req.url);
+      if(!fs.existsSync(f)){res.writeHead(404);res.end();return;}
+      res.setHeader('Content-Type','video/mp4');
+      fs.createReadStream(f).pipe(res);
+    });
+    server.listen(8766,()=>console.log('Video server started on 8766'));
+    setTimeout(()=>{server.close();process.exit(0);},48*60*60*1000);
+  `;
+  const srv = spawn(process.execPath, ['-e', serverScript], { detached: true, stdio: 'ignore' });
+  srv.unref();
+  await new Promise(resolve => setTimeout(resolve, 800));
   console.log(`Serving video at ${videoUrl}`);
 
-  // Post to Buffer
-  console.log('Posting to Buffer...');
+  // Create Buffer drafts
+  console.log('Creating Buffer drafts...');
   await bufferPost('youtube', ytDesc, schedDate, videoUrl, { title: chosenTitle, categoryId: '22' });
   await bufferPost('instagram', chosenIg, schedDate, videoUrl, { type: 'reel', shouldShareToFeed: true });
   if (wantLi && chosenLi) await bufferPost('linkedin', chosenLi, schedDate);
 
-  // Give Buffer 30s to fetch the video, then clean up
-  await new Promise(resolve => setTimeout(resolve, 30000));
-  tmpServer.close();
-  try { fs.unlinkSync(tmpVideoPath); } catch {}
-  console.log('Video server closed, tmp file deleted.');
+  console.log('Buffer drafts created. Video server running for 48h.');
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -500,7 +510,11 @@ async function runApproval(approvalStr, runId = null) {
   await sheetsUpdate(token, statusRange, [['processed']]);
 
   // Confirm to Slack
-  await slackDm(`:white_check_mark: Scheduled for ${schedDate.slice(0, 10)}: *${chosenTitle}*`);
+  await slackDm(
+    `:white_check_mark: *Drafted in Buffer:* ${chosenTitle}\n` +
+    `Planned for *${schedDate.slice(0, 10)}* at 10am. Review and post at <https://publish.buffer.com/|publish.buffer.com>\n` +
+    `_I'll chase you at noon on the day if it hasn't gone out._`
+  );
   console.log('Approval processed.');
 }
 
@@ -521,6 +535,70 @@ async function runSkip(runId = null) {
   console.log('Skipped.');
 }
 
+// ── CHASE ─────────────────────────────────────────────────────────────────────
+// Runs at noon UTC. If Buffer drafts exist for today or earlier, DM George.
+
+async function runChase() {
+  console.log('Chase check starting...');
+
+  const channelIds = [BUFFER_CHANNELS.instagram, BUFFER_CHANNELS.youtube].filter(Boolean);
+  const body = JSON.stringify({
+    query: `query GetDrafts($input: PostsInput!) {
+      posts(input: $input) {
+        edges {
+          node {
+            id
+            status
+            dueAt
+            channelService
+            metadata {
+              ... on YoutubePostMetadata { title }
+            }
+          }
+        }
+      }
+    }`,
+    variables: {
+      input: {
+        organizationId: BUFFER_ORG_ID,
+        filter: { status: ['draft'], channelIds },
+      },
+    },
+  });
+
+  const resp = await request('https://api.buffer.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${BUFFER_TOKEN}`,
+      'Content-Length': Buffer.byteLength(body),
+    },
+    body,
+  });
+
+  const drafts = (resp?.data?.posts?.edges || []).map(e => e.node);
+  if (drafts.length === 0) {
+    console.log('No drafts in Buffer — nothing to chase.');
+    return;
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const overdue = drafts.filter(d => !d.dueAt || d.dueAt.slice(0, 10) <= todayStr);
+
+  if (overdue.length === 0) {
+    console.log('Buffer drafts exist but none due today — no chase needed.');
+    return;
+  }
+
+  const platforms = [...new Set(overdue.map(d => d.channelService))].join(' + ');
+  await slackDm(
+    `:alarm_clock: *Posting reminder:* You have ${overdue.length} draft post(s) in Buffer (${platforms}) ` +
+    `planned for today that haven\'t been published yet.\n` +
+    `<https://publish.buffer.com/|Open Buffer to review and post>`
+  );
+  console.log(`Chased George about ${overdue.length} outstanding draft(s).`);
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
@@ -535,7 +613,9 @@ if (mode === '--check') {
 } else if (mode === '--skip') {
   const runId = args[1] || null;
   runSkip(runId).catch(e => { console.error(e); process.exit(1); });
+} else if (mode === '--chase') {
+  runChase().catch(e => { console.error(e); process.exit(1); });
 } else {
-  console.error('Usage: node bba-pipeline-check.js --check | --approve "title N, ig N" [run_id] | --skip [run_id]');
+  console.error('Usage: node bba-pipeline-check.js --check | --approve "title N, ig N" [run_id] | --skip [run_id] | --chase');
   process.exit(1);
 }

@@ -68,14 +68,16 @@ _run_id: [run_id]_
 2. Read "Pending Approvals" tab, find the row with status=awaiting
    (If a run_id was included in the prompt, match on that; otherwise take the only awaiting row)
 3. Extract the chosen title, ig caption, linkedin post, yt_description, schedule_date, drive_file_id
-4. Use Buffer MCP: create a YouTube draft post with the chosen title and yt_description, scheduled for schedule_date
-5. Use Buffer MCP: create an Instagram draft post with the chosen ig caption, scheduled for schedule_date
-6. If LinkedIn was requested: use Buffer MCP to create a LinkedIn draft, scheduled for schedule_date
+4. Use Buffer MCP: create a YouTube POST AS A DRAFT (saveToDraft: true) with the chosen title and yt_description, dueAt=schedule_date
+5. Use Buffer MCP: create an Instagram POST AS A DRAFT (saveToDraft: true) with the chosen ig caption, dueAt=schedule_date
+6. If LinkedIn was requested: use Buffer MCP to create a LinkedIn DRAFT, dueAt=schedule_date
 7. Append a row to "Processed Videos" tab: drive_file_id, filename, processed_date (today), chosen_title, chosen_ig
 8. Append a row to "Raw Transcripts" tab: filename, transcript, processed_date
 9. Update the "Pending Approvals" row: set status=processed
 10. Send confirmation to George via Slack MCP:
-    ✅ Scheduled for [schedule_date]: *[chosen_title]*
+    ✅ *Drafted in Buffer:* [chosen_title]
+    Planned for [schedule_date] at 10am. Review and post at https://publish.buffer.com/
+    _I'll chase you at noon on the day if it hasn't gone out._
 
 ---
 
