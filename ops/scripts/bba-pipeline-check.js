@@ -347,7 +347,7 @@ Output EXACTLY this JSON (no other text):
 
 Rules:
 - YouTube titles: punchy, under 60 chars each, no clickbait, no em dashes
-- Instagram captions: hook + body + 3-5 hashtags, no em dashes
+- Instagram captions: hook + body + MUST end with 5 relevant hashtags (e.g. #UKHaulage #FleetManagement #HaulageAdmin #LogisticsUK #TruckingLife), no em dashes
 - LinkedIn: professional, 2-3 short paragraphs, no em dashes
 - YouTube description: 2-3 sentences + hashtags`;
 
@@ -379,8 +379,8 @@ Rules:
     `3. ${title_3}`,
     '',
     '*Instagram captions:*',
-    `1. ${ig_1.slice(0, 120)}${ig_1.length > 120 ? '...' : ''}`,
-    `2. ${ig_2.slice(0, 120)}${ig_2.length > 120 ? '...' : ''}`,
+    `1. ${ig_1.slice(0, 400)}${ig_1.length > 400 ? '...' : ''}`,
+    `2. ${ig_2.slice(0, 400)}${ig_2.length > 400 ? '...' : ''}`,
     '',
     'Reply: `title [n], ig [n]` (add `, li` for LinkedIn)',
     `_run_id: ${runId}_`,
