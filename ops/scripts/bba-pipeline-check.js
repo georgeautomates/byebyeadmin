@@ -217,20 +217,22 @@ const BUFFER_CHANNELS = {
   linkedin:  null, // not connected
 };
 
-async function bufferPost(serviceType, text, scheduledAt) {
+async function bufferPost(serviceType, text, scheduledAt, videoUrl = null) {
   const channelId = BUFFER_CHANNELS[serviceType.toLowerCase()];
   if (!channelId) { console.error(`No Buffer channel for: ${serviceType}`); return null; }
 
+  const input = {
+    channelId,
+    text,
+    dueAt: new Date(scheduledAt).toISOString(),
+    schedulingType: 'automatic',
+    mode: 'customScheduled',
+  };
+  if (videoUrl) input.assets = { videos: [{ url: videoUrl }] };
+
   const body = JSON.stringify({
     query: `mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } } }`,
-    variables: {
-      input: {
-        channelId,
-        text,
-        scheduledAt: new Date(scheduledAt).toISOString(),
-        status: 'scheduled',
-      },
-    },
+    variables: { input },
   });
 
   const resp = await request('https://api.buffer.com/graphql', {
@@ -448,12 +450,39 @@ async function runApproval(approvalStr, runId = null) {
   const transcript  = d[COL.transcript] || '';
   const rowRunId    = d[COL.run_id];
 
+  // Download video from Drive to serve temporarily for Buffer upload
+  console.log('Downloading video for Buffer...');
+  const driveToken = await getDriveToken();
+  const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const tmpVideoPath = `/tmp/${safeFilename}`;
+  execSync(
+    `curl -s -L "https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media" ` +
+    `-H "Authorization: Bearer ${driveToken}" -o "${tmpVideoPath}"`,
+    { stdio: 'pipe' }
+  );
+
+  // Serve video temporarily on port 8766
+  const videoUrl = `http://178.104.12.113:8766/${safeFilename}`;
+  const tmpServer = http.createServer((req, res) => {
+    const stream = fs.createReadStream(tmpVideoPath);
+    res.setHeader('Content-Type', 'video/mp4');
+    stream.pipe(res);
+  });
+  await new Promise(resolve => tmpServer.listen(8766, resolve));
+  console.log(`Serving video at ${videoUrl}`);
+
   // Post to Buffer
   console.log('Posting to Buffer...');
   const ytText = `${chosenTitle}\n\n${ytDesc}`;
-  await bufferPost('youtube', ytText, schedDate);
-  await bufferPost('instagram', chosenIg, schedDate);
+  await bufferPost('youtube', ytText, schedDate, videoUrl);
+  await bufferPost('instagram', chosenIg, schedDate, videoUrl);
   if (wantLi && chosenLi) await bufferPost('linkedin', chosenLi, schedDate);
+
+  // Give Buffer 30s to fetch the video, then clean up
+  await new Promise(resolve => setTimeout(resolve, 30000));
+  tmpServer.close();
+  try { fs.unlinkSync(tmpVideoPath); } catch {}
+  console.log('Video server closed, tmp file deleted.');
 
   const today = new Date().toISOString().slice(0, 10);
 
