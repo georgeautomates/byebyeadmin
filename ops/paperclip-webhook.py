@@ -35,11 +35,17 @@ SCRIPTS        = '/home/openclaw/byebyeadmin/ops/scripts'
 
 # Agent IDs — used to create Paperclip issues per run
 AGENT_IDS = {
-    'morning-brief':    '718f13c4-06a8-45cb-927c-b5222eaff473',
-    'weekly-analytics': 'e919e9fa-7ce7-4a03-8413-f1ff2b0ec6ee',
-    'pipeline-check':   'c3efa1b1-8abc-49e9-b06c-f28a9d3110d4',
-    'content-inventory':'afd1fb9c-721d-45b1-b2a2-67a2e965dc84',
-    'website-review':   '42a0c3ff-e4fd-41ab-b40e-532cba86e0e5',
+    'morning-brief':      '718f13c4-06a8-45cb-927c-b5222eaff473',
+    'weekly-analytics':   'e919e9fa-7ce7-4a03-8413-f1ff2b0ec6ee',
+    'pipeline-check':     'c3efa1b1-8abc-49e9-b06c-f28a9d3110d4',
+    'content-inventory':  'afd1fb9c-721d-45b1-b2a2-67a2e965dc84',
+    'website-review':     '42a0c3ff-e4fd-41ab-b40e-532cba86e0e5',
+    # New agents — IDs set after Paperclip registration on VPS
+    'hot-lead-monitor':   os.environ.get('PAPERCLIP_AGENT_HOT_LEADS', ''),
+    'content-strategist': os.environ.get('PAPERCLIP_AGENT_CONTENT_STRATEGIST', ''),
+    'blog-writer':        os.environ.get('PAPERCLIP_AGENT_BLOG_WRITER', ''),
+    'campaign-builder':   os.environ.get('PAPERCLIP_AGENT_CAMPAIGN_BUILDER', ''),
+    'ceo-brief':          os.environ.get('PAPERCLIP_AGENT_CEO_BRIEF', ''),
 }
 
 def paperclip_post(path, data):
@@ -87,11 +93,16 @@ log = logging.getLogger('paperclip-webhook')
 # ── agent dispatch map ─────────────────────────────────────────────────────────
 
 AGENTS = {
-    'morning-brief':    ['python3', f'{SCRIPTS}/bba-morning-briefing.py'],
-    'weekly-analytics': ['python3', f'{SCRIPTS}/bba-weekly-analytics.py'],
-    'pipeline-check':   [NODE,      f'{SCRIPTS}/bba-pipeline-check.js', '--check'],
-    'content-inventory':['python3', f'{SCRIPTS}/bba-content-inventory.py'],
-    'website-review':   ['python3', f'{SCRIPTS}/bba-website-review.py'],
+    'morning-brief':      ['python3', f'{SCRIPTS}/bba-morning-briefing.py'],
+    'weekly-analytics':   ['python3', f'{SCRIPTS}/bba-weekly-analytics.py'],
+    'pipeline-check':     [NODE,      f'{SCRIPTS}/bba-pipeline-check.js', '--check'],
+    'content-inventory':  ['python3', f'{SCRIPTS}/bba-content-inventory.py'],
+    'website-review':     ['python3', f'{SCRIPTS}/bba-website-review.py'],
+    'hot-lead-monitor':   ['python3', f'{SCRIPTS}/bba-hot-leads.py'],
+    'content-strategist': ['python3', f'{SCRIPTS}/bba-content-strategist.py'],
+    'blog-writer':        ['python3', f'{SCRIPTS}/bba-blog-writer.py', '--topic', 'scheduled run'],
+    'campaign-builder':   ['python3', f'{SCRIPTS}/bba-campaign-builder.py', '--segment', 'scheduled run'],
+    'ceo-brief':          ['python3', f'{SCRIPTS}/bba-ceo-brief.py'],
 }
 
 # ── HTTP handler ───────────────────────────────────────────────────────────────

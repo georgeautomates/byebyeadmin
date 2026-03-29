@@ -115,6 +115,41 @@ app.message(async ({ message, say, client }) => {
     return;
   }
 
+  // --- blog: [topic]: trigger blog writer ---
+  const blogMatch = text.match(/^blog:\s*(.+)/i);
+  if (blogMatch) {
+    await say({ text: ':memo: Writing blog post... (2-3 min)', thread_ts: message.ts });
+    const scriptPath = '/home/openclaw/byebyeadmin/ops/scripts/bba-blog-writer.py';
+    exec(`python3 ${scriptPath} --topic ${JSON.stringify(blogMatch[1])}`, (err, stdout, stderr) => {
+      if (err) console.error('Blog writer error:', stderr);
+      else console.log('Blog writer done:', stdout.substring(0, 200));
+    });
+    return;
+  }
+
+  // --- campaign: [segment]: trigger campaign builder ---
+  const campaignMatch = text.match(/^campaign:\s*(.+)/i);
+  if (campaignMatch) {
+    await say({ text: ':email: Building campaign sequence... (1-2 min)', thread_ts: message.ts });
+    const scriptPath = '/home/openclaw/byebyeadmin/ops/scripts/bba-campaign-builder.py';
+    exec(`python3 ${scriptPath} --segment ${JSON.stringify(campaignMatch[1])}`, (err, stdout, stderr) => {
+      if (err) console.error('Campaign builder error:', stderr);
+      else console.log('Campaign builder done:', stdout.substring(0, 200));
+    });
+    return;
+  }
+
+  // --- ceo brief: trigger CEO brief now ---
+  if (/^ceo brief$/i.test(text)) {
+    await say({ text: ':briefcase: Running CEO brief...', thread_ts: message.ts });
+    const scriptPath = '/home/openclaw/byebyeadmin/ops/scripts/bba-ceo-brief.py';
+    exec(`python3 ${scriptPath}`, (err, stdout, stderr) => {
+      if (err) console.error('CEO brief error:', stderr);
+      else console.log('CEO brief done:', stdout.substring(0, 200));
+    });
+    return;
+  }
+
   // --- agent: or fallback: full ops context chat ---
   let threadHistory = [];
   if (message.thread_ts) {

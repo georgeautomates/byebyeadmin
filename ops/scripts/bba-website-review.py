@@ -28,6 +28,7 @@ GCP_SECRET      = os.environ.get('GOOGLE_CLIENT_SECRET', os.environ.get('GMAIL_C
 GCP_REFRESH     = os.environ['GOOGLE_REFRESH_TOKEN']
 CLARITY_TOKEN   = os.environ['CLARITY_API_TOKEN']
 CLARITY_PROJECT = os.environ.get('CLARITY_PROJECT_ID', 'r4uxcnbez8')
+SHEET_ID        = os.environ.get('GOOGLE_CONTENT_SHEET_ID', '')
 
 def get(url, headers=None):
     try:
@@ -244,6 +245,51 @@ print('Calling LLM...')
 text = call_llm(prompt, max_tokens=2000)
 if not text:
     text = ':warning: Weekly website review failed — check cron.log'
+
+# ── CRO section (second LLM call — Haiku) ─────────────────────────────────────
+
+print('Generating CRO tasks...')
+cro_raw = call_llm(
+    f'Based on this GA4 and Clarity data for byebyeadmin.co.uk, output EXACTLY 3 CRO tasks.\n\n'
+    f'Each task must be on ONE line in this exact pipe-delimited format:\n'
+    f'PAGE | ELEMENT | CHANGE | WHY\n\n'
+    f'Rules:\n- Specific pages and elements (e.g. "/assessment | CTA button | Change colour to orange | 62% bounce rate")\n'
+    f'- No em dashes\n- No markdown\n- Exactly 3 lines, nothing else\n\n'
+    f'RAW DATA:\n'
+    f'ga4_traffic={json.dumps(traffic)}\n'
+    f'ga4_landing={json.dumps(landing)}\n'
+    f'ga4_funnel={json.dumps(funnel)}\n'
+    f'clarity={json.dumps(clarity_dash)}',
+    max_tokens=400
+)
+
+cro_tasks = []
+cro_slack_lines = []
+if cro_raw:
+    for line in cro_raw.strip().splitlines():
+        line = line.strip()
+        if '|' not in line:
+            continue
+        parts = [p.strip() for p in line.split('|')]
+        if len(parts) >= 4:
+            page, element, change, why = parts[0], parts[1], parts[2], parts[3]
+            cro_tasks.append([today, page, element, change, why, 'todo'])
+            cro_slack_lines.append(f'• *{page}*: {change}')
+
+# Append CRO rows to Google Sheet "CRO Backlog" tab
+if cro_tasks and gcp_token and SHEET_ID:
+    print(f'Writing {len(cro_tasks)} CRO tasks to sheet...')
+    post_json(
+        f'https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}'
+        f'/values/CRO%20Backlog!A:F:append?valueInputOption=USER_ENTERED',
+        {'values': cro_tasks},
+        {'Authorization': f'Bearer {gcp_token}'}
+    )
+
+if cro_slack_lines:
+    cro_section = '\n\n*7. CRO Backlog (3 tasks added)*\n' + '\n'.join(cro_slack_lines)
+    # Insert before any truncation
+    text = text + cro_section
 
 # Truncate to Slack limit
 if len(text) > 3800:

@@ -68,8 +68,18 @@ All scheduled AI logic runs as Python/Node.js scripts directly on the VPS. Scrip
 | `ops/scripts/bba-morning-briefing.py` | 8am UTC Mon-Fri | Daily snapshot: Instantly + YouTube + GA4 + Clarity → Slack |
 | `ops/scripts/bba-weekly-analytics.py` | 8:30am UTC Monday | 7-day KPIs with WoW deltas + writes Google Sheets → Slack |
 | `ops/scripts/bba-pipeline-check.js` | 9am + 5pm UTC daily | Drive → Whisper → Claude → Buffer content pipeline |
-| `ops/scripts/bba-content-inventory.py` | 6am UTC daily | Buffer YouTube queue alert if <3 posts in next 7 days |
-| `ops/scripts/bba-website-review.py` | 8am UTC Sunday | GA4 + Clarity weekly website report (Claude Sonnet) → Slack |
+| `ops/scripts/bba-content-inventory.py` | 6am UTC daily | Buffer YouTube queue alert if <3 posts; LLM video topic ideas |
+| `ops/scripts/bba-website-review.py` | 8am UTC Sunday | GA4 + Clarity weekly website report + 3 CRO tasks → Sheets |
+| `ops/scripts/bba-hot-leads.py` | Every 2h | Instantly reply monitor: classify HOT/WARM/COLD → Slack + Sheets |
+| `ops/scripts/bba-content-strategist.py` | 7am UTC Monday | YouTube + Buffer + GA4 → 5 video ideas with hooks → Slack |
+| `ops/scripts/bba-ceo-brief.py` | 10am UTC Sunday | Weekly CEO synthesis: all KPIs + strategic brief → Slack |
+
+### On-demand scripts (via Slack DM to Johnson)
+
+| Script | Trigger | Purpose |
+|--------|---------|---------|
+| `ops/scripts/bba-blog-writer.py` | `blog: [topic]` | Perplexity research + Claude Sonnet → 1,500 word blog post → Google Doc |
+| `ops/scripts/bba-campaign-builder.py` | `campaign: [segment]` | Brand context + Claude Sonnet → 5-email cold sequence → Slack for approval |
 
 ### VPS files
 
@@ -86,6 +96,9 @@ agents/archive/          — old remote trigger implementations (reference only)
 0 9,17 * * *  /home/openclaw/.nvm/versions/node/v22.22.1/bin/node /home/openclaw/byebyeadmin/ops/scripts/bba-pipeline-check.js --check >> ~/.openclaw/cron.log 2>&1
 0 6 * * *     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-content-inventory.py >> ~/.openclaw/cron.log 2>&1
 0 8 * * 0     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-website-review.py >> ~/.openclaw/cron.log 2>&1
+0 */2 * * *   python3 /home/openclaw/byebyeadmin/ops/scripts/bba-hot-leads.py >> ~/.openclaw/cron.log 2>&1
+0 7 * * 1     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-content-strategist.py >> ~/.openclaw/cron.log 2>&1
+0 10 * * 0    python3 /home/openclaw/byebyeadmin/ops/scripts/bba-ceo-brief.py >> ~/.openclaw/cron.log 2>&1
 ```
 
 Logs: `tail -f ~/.openclaw/cron.log` on VPS.
