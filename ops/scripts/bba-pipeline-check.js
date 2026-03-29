@@ -222,7 +222,7 @@ async function bufferPost(serviceType, text, scheduledAt) {
   if (!channelId) { console.error(`No Buffer channel for: ${serviceType}`); return null; }
 
   const body = JSON.stringify({
-    query: `mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { post { id } errors { message } } }`,
+    query: `mutation CreatePost($input: CreatePostInput!) { createPost(input: $input) { ... on PostActionSuccess { post { id } } ... on PostActionError { message } } }`,
     variables: {
       input: {
         channelId,
