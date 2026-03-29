@@ -47,6 +47,8 @@ AGENT_IDS = {
     'campaign-builder':   '1c478422-6aba-4dd2-a5fc-32a3ce6a8fe4',
     'ceo-brief':          '880bc2ea-22bd-4e8d-abff-d3c8cc19a7ed',
     'copywriter':         'a85864ef-7691-4fd4-a715-5248d3b8f356',
+    'cron-watchdog':      '88ccefac-ed41-4efb-9b25-ea40401fedb8',
+    'chief-of-staff':     'ce07090f-ec39-4384-82ff-47c286bc01d1',
 }
 
 def paperclip_post(path, data):

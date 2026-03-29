@@ -4,7 +4,47 @@
       "command": "npx",
       "args": ["-y", "instantly-mcp"],
       "env": {
-        "INSTANTLY_API_KEY": "${INSTANTLY_API_KEY}"
+        "INSTANTLY_API_KEY": "MmJjOGUwODYtYTA5ZC00MzBmLTkzYjUtNDRjYjljZWJhZTNmOnNsSEFCaUNKc3NIcw=="
+      }
+    },
+    "clarity-mcp": {
+      "command": "npx",
+      "args": ["-y", "@microsoft/clarity-mcp-server"],
+      "env": {
+        "CLARITY_API_TOKEN": "${CLARITY_API_TOKEN}",
+        "CLARITY_PROJECT_ID": "${CLARITY_PROJECT_ID}"
+      }
+    },
+    "n8n-mcp": {
+      "command": "npx",
+      "args": ["-y", "n8n-mcp"],
+      "env": {
+        "N8N_API_URL": "https://n8n.srv1155250.hstgr.cloud/api/v1",
+        "N8N_API_KEY": "${N8N_API_KEY}",
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "error",
+        "DISABLE_CONSOLE_OUTPUT": "true"
+      }
+    },
+    "buffer-mcp": {
+      "type": "http",
+      "url": "https://mcp.buffer.com/mcp",
+      "headers": {
+        "Authorization": "Bearer Dn5OmyMq8iDtxYX5zB64EB0KIO_PwTiluRnJ6xQ-K_R"
+      }
+    },
+    "google-analytics": {
+      "command": "/Users/george/.local/bin/analytics-mcp",
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "/Users/george/.config/gcloud/application_default_credentials.json",
+        "GA4_PROPERTY_ID": "527598212"
+      }
+    },
+    "perplexity-mcp": {
+      "command": "npx",
+      "args": ["-y", "perplexity-mcp"],
+      "env": {
+        "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}"
       }
     }
   }
