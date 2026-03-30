@@ -158,10 +158,14 @@ class WebhookHandler(BaseHTTPRequestHandler):
         log.info('Running agent=%s run_id=%s', agent_name, run_id)
         start = time.time()
 
-        # Open a Paperclip issue to track this run
+        # Open a Paperclip issue to track this run.
+        # Skip for agents that Paperclip invokes directly (e.g. johnson/ceo role) —
+        # those already have an issue created by Paperclip. Creating another one
+        # assigned back to the same agent causes an infinite retry loop.
+        SKIP_ISSUE_CREATION = {'johnson'}
         issue_id = None
         agent_id = AGENT_IDS.get(agent_name)
-        if agent_id and COMPANY_ID:
+        if agent_id and COMPANY_ID and agent_name not in SKIP_ISSUE_CREATION:
             issue = paperclip_post(f'/companies/{COMPANY_ID}/issues', {
                 'title':          f'Run: {agent_name}',
                 'assigneeAgentId': agent_id,
