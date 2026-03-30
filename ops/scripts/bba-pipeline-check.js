@@ -467,8 +467,24 @@ async function runApproval(approvalStr, runId = null) {
     { stdio: 'pipe' }
   );
 
+  // Compress to H.264 1080x1920 for Instagram/YouTube compatibility (original may be HEVC/4K)
+  const igFilename = safeFilename.replace(/\.[^.]+$/, '_h264.mp4');
+  const igVideoPath = `/tmp/${igFilename}`;
+  console.log('Compressing to H.264 for Buffer...');
+  try {
+    execSync(
+      `ffmpeg -i "${tmpVideoPath}" -vcodec libx264 -crf 23 -preset fast -vf "scale=1080:1920" ` +
+      `-acodec aac -b:a 128k -movflags +faststart "${igVideoPath}" -y 2>/dev/null`,
+      { stdio: 'pipe', timeout: 300000 }
+    );
+    console.log('Compression done.');
+  } catch (e) {
+    console.error('Compression failed, using original:', e.message);
+    fs.copyFileSync(tmpVideoPath, igVideoPath);
+  }
+
   // Kill any existing server on port 8766, then start a background server (48h auto-stop)
-  const videoUrl = `http://178.104.12.113:8766/${safeFilename}`;
+  const videoUrl = `http://178.104.12.113:8766/${igFilename}`;
   try { execSync('fuser -k 8766/tcp 2>/dev/null || true', { stdio: 'pipe' }); } catch {}
   await new Promise(resolve => setTimeout(resolve, 500));
 
