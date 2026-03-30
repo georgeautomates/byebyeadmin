@@ -42,6 +42,19 @@ def get_json(url):
         print(f'  GET failed: {e}', file=sys.stderr)
         return None
 
+def patch_issue(issue_id, data):
+    if not COMPANY_ID or not issue_id:
+        return
+    try:
+        body = json.dumps(data).encode()
+        req  = urllib.request.Request(
+            f'{PAPERCLIP_URL}/api/issues/{issue_id}',
+            data=body, method='PATCH',
+            headers={'Content-Type': 'application/json'})
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        print(f'  Paperclip PATCH failed: {e}', file=sys.stderr)
+
 def call_llm(prompt, max_tokens=800):
     # Cascade: Gemini → Groq → OpenAI (Anthropic rate-limited on this VPS)
     gemini_key = os.environ.get('GEMINI_API_KEY', '')
@@ -161,32 +174,66 @@ George has assigned you a task via the Paperclip board.
 Task title: {title}
 Task description: {description[:800]}
 
-Your job: assess this task, decide whether you can handle it directly or need to delegate,
-and write a brief response for George on Slack.
+Your job: assess this task and produce TWO outputs — a full assessment for Paperclip, and a
+brief one-line Slack ping so George knows it is done.
 
 Available agents you can delegate to:
 {AGENT_ROSTER}
 
-Write a short Slack message (max 200 words) that:
-1. Acknowledges the task
-2. States your assessment or next step (or which agent you'd delegate to and why)
-3. Flags if you need more info from George
+Format your response EXACTLY like this (no extra lines between the headers):
 
-Rules: no em dashes, be direct, use bullet points if helpful.
-Start the message with: :briefcase: *Johnson — task received*
+PAPERCLIP_RESULT:
+[Full assessment: what the task is, your recommended approach or delegation, any blockers,
+next steps. 100-300 words. No em dashes. Bullet points welcome.]
+
+SLACK_NOTIFICATION:
+[:briefcase: *Johnson* — one sentence summary of action taken or recommended, max 20 words.]
 """
 
-response = call_llm(prompt)
-if not response:
-    response = f':briefcase: *Johnson — task received*\n\nTask: _{title}_\n\nI received this but could not process it automatically. Please check Paperclip issue `{issue_id}`.'
+raw = call_llm(prompt, max_tokens=1200)
 
-print(f'LLM response: {len(response)} chars')
+# ── parse sections ────────────────────────────────────────────────────────────
 
-# ── post to Slack ─────────────────────────────────────────────────────────────
+def parse_section(text, header):
+    marker = f'{header}:'
+    idx = text.find(marker)
+    if idx == -1:
+        return ''
+    start = idx + len(marker)
+    # Find next section header (all-caps word followed by colon at line start)
+    import re
+    next_header = re.search(r'\n[A-Z_]+:', text[start:])
+    end = start + next_header.start() if next_header else len(text)
+    return text[start:end].strip()
 
-ok = post_slack(response)
+if raw:
+    paperclip_text = parse_section(raw, 'PAPERCLIP_RESULT')
+    slack_text     = parse_section(raw, 'SLACK_NOTIFICATION')
+else:
+    paperclip_text = ''
+    slack_text     = ''
+
+if not paperclip_text:
+    paperclip_text = f'Task received but LLM processing failed. Raw output:\n\n{raw[:1000]}' if raw else 'Task received but LLM returned no output.'
+if not slack_text:
+    slack_text = f':briefcase: *Johnson* — task `{title}` received. Check Paperclip issue for details.'
+
+print(f'Paperclip result: {len(paperclip_text)} chars')
+print(f'Slack notification: {slack_text[:120]}')
+
+# ── write result to Paperclip issue ──────────────────────────────────────────
+
+patch_issue(issue_id, {
+    'status':      'done',
+    'description': paperclip_text,
+})
+print(f'Paperclip issue {issue_id} marked done.')
+
+# ── post brief notification to Slack ─────────────────────────────────────────
+
+ok = post_slack(slack_text)
 if ok:
-    print('Johnson response sent to Slack.')
+    print('Johnson notification sent to Slack.')
 else:
     print('Slack post failed.', file=sys.stderr)
     sys.exit(1)
