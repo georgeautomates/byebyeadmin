@@ -461,9 +461,17 @@ def build_segments():
     def sep(): return ('──────────────────────────────────────────\n', 'NORMAL_TEXT')
 
     segments = []
+    from datetime import datetime
+    updated = datetime.utcnow().strftime('%-d %B %Y')
+
     segments.append(h1('BBA Agent Handbook'))
-    segments.append(p('ByeByeAdmin AI Operations — last updated March 2026'))
+    segments.append(p(f'ByeByeAdmin AI Operations — last updated {updated}'))
     segments.append(p('This handbook profiles every agent in the BBA Paperclip workspace. Each agent has a defined role, schedule, and output. Read it to understand who does what, when, and why.'))
+    segments.append(p(''))
+    segments.append(h3('Maintenance'))
+    segments.append(p('This document is the source of truth for all BBA agents. It must be kept up to date. Any time a new agent is added, an existing agent changes role or schedule, or new skills/tools are wired in, run the update command:'))
+    segments.append(p('ssh openclaw@178.104.12.113 "python3 /home/openclaw/byebyeadmin/ops/scripts/bba-agent-handbook.py --update 1mjC6i_g_hPOs3dyLGBP0RCJMsdMw2t_-m6oFNx4w26k"'))
+    segments.append(p('The script lives at ops/scripts/bba-agent-handbook.py in the byebyeadmin repo. Edit the AGENTS list there, then push and run the command above.'))
     segments.append(p(''))
 
     for agent in AGENTS:
