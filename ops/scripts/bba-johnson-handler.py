@@ -43,19 +43,7 @@ def get_json(url):
         return None
 
 def call_llm(prompt, max_tokens=800):
-    if ANTHROPIC_KEY:
-        body = json.dumps({'model': 'claude-sonnet-4-6', 'max_tokens': max_tokens,
-            'messages': [{'role': 'user', 'content': prompt}]}).encode()
-        req = urllib.request.Request('https://api.anthropic.com/v1/messages', data=body,
-            headers={'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01',
-                     'Content-Type': 'application/json'})
-        try:
-            resp = json.loads(urllib.request.urlopen(req, timeout=60).read())
-            text = resp.get('content', [{}])[0].get('text', '')
-            if text:
-                return text
-        except Exception as e:
-            print(f'  Anthropic failed: {e}', file=sys.stderr)
+    # Cascade: Gemini → Groq → OpenAI (Anthropic rate-limited on this VPS)
     gemini_key = os.environ.get('GEMINI_API_KEY', '')
     if gemini_key:
         body = json.dumps({'contents': [{'parts': [{'text': prompt}]}],
@@ -65,9 +53,24 @@ def call_llm(prompt, max_tokens=800):
         req = urllib.request.Request(gurl, data=body, headers={'Content-Type': 'application/json'})
         try:
             resp = json.loads(urllib.request.urlopen(req, timeout=60).read())
-            return resp['candidates'][0]['content']['parts'][0]['text']
+            text = resp['candidates'][0]['content']['parts'][0]['text']
+            if text:
+                return text
         except Exception as e:
             print(f'  Gemini failed: {e}', file=sys.stderr)
+    groq_key = os.environ.get('GROQ_API_KEY', '')
+    if groq_key:
+        body = json.dumps({'model': 'llama-3.3-70b-versatile', 'max_tokens': max_tokens,
+            'messages': [{'role': 'user', 'content': prompt}]}).encode()
+        req = urllib.request.Request('https://api.groq.com/openai/v1/chat/completions', data=body,
+            headers={'Authorization': f'Bearer {groq_key}', 'Content-Type': 'application/json'})
+        try:
+            resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
+            text = resp['choices'][0]['message']['content']
+            if text:
+                return text
+        except Exception as e:
+            print(f'  Groq failed: {e}', file=sys.stderr)
     openai_key = os.environ.get('OPENAI_API_KEY', '')
     if not openai_key:
         return ''
@@ -100,21 +103,30 @@ def post_slack(text):
 
 print(f'Johnson handler — run_id={RUN_ID}')
 
-# Fetch the issue assigned to this run
+JOHNSON_ID = '80570e2d-92fd-431c-8239-1f5d48826927'
+
+# Find the actual task assigned to Johnson.
+# Paperclip creates the issue before calling the webhook. We look for the most
+# recent non-tracking issue assigned to Johnson (status: todo or in_progress,
+# title does NOT start with "Run:" which are internal webhook tracking issues).
 issue = None
-if RUN_ID and COMPANY_ID:
-    # Try to find the issue from recent issues matching this run
+if COMPANY_ID:
     data = get_json(f'{PAPERCLIP_URL}/api/companies/{COMPANY_ID}/issues?limit=50')
     if isinstance(data, dict):
         data = data.get('issues', data.get('items', data.get('data', [])))
-    for i in (data or []):
-        if i.get('assigneeAgentId') == '80570e2d-92fd-431c-8239-1f5d48826927' and i.get('status') == 'in_progress':
-            issue = i
-            break
+    candidates = [
+        i for i in (data or [])
+        if i.get('assigneeAgentId') == JOHNSON_ID
+        and i.get('status') in ('todo', 'in_progress')
+        and not i.get('title', '').startswith('Run:')
+    ]
+    # Most recently created first
+    candidates.sort(key=lambda x: x.get('createdAt', ''), reverse=True)
+    if candidates:
+        issue = candidates[0]
 
 if not issue:
-    print('No in-progress issue found for Johnson. Nothing to act on.')
-    post_slack(':information_source: *Johnson* received a Paperclip task ping but could not find the associated issue. Check Paperclip for context.')
+    print('No actionable task found for Johnson.')
     sys.exit(0)
 
 title       = issue.get('title', '(no title)')
