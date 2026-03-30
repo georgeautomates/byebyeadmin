@@ -1,27 +1,36 @@
 """Shared LLM cascade for BBA scripts.
 
-Priority: Claude CLI (subscription) → Gemini → Groq → OpenAI
+Priority: Anthropic → Gemini → Groq → OpenAI
+Note: claude.ai/oauth is Cloudflare-blocked on Hetzner VPS — CLI auth not possible.
+Anthropic API key is used directly. Rate-limited until 2026-04-01 on this VPS IP.
+
 Import: from bba_llm import call_llm
 """
-import os, json, subprocess, sys, urllib.request
-
-CLAUDE_BIN  = '/home/openclaw/.nvm/versions/node/v22.22.1/bin/claude'
-NODE_BIN    = '/home/openclaw/.nvm/versions/node/v22.22.1/bin'
+import os, json, sys, urllib.request
 
 def call_llm(prompt, max_tokens=800):
-    # 1. Claude Code CLI (uses george's claude.ai subscription)
-    if os.path.exists(CLAUDE_BIN):
-        env = {**os.environ, 'PATH': f'{NODE_BIN}:{os.environ.get("PATH", "")}'}
+    # 1. Anthropic (primary — unblocked from Apr 1 2026)
+    anthropic_key = os.environ.get('ANTHROPIC_API_KEY', '')
+    if anthropic_key:
+        body = json.dumps({
+            'model': 'claude-haiku-4-5-20251001',
+            'max_tokens': max_tokens,
+            'messages': [{'role': 'user', 'content': prompt}],
+        }).encode()
+        req = urllib.request.Request(
+            'https://api.anthropic.com/v1/messages', data=body,
+            headers={
+                'x-api-key': anthropic_key,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+            })
         try:
-            result = subprocess.run(
-                [CLAUDE_BIN, '--print', prompt],
-                capture_output=True, text=True, timeout=120, env=env,
-            )
-            text = result.stdout.strip()
-            if result.returncode == 0 and text and 'Not logged in' not in text:
+            resp = json.loads(urllib.request.urlopen(req, timeout=60).read())
+            text = resp['content'][0]['text']
+            if text:
                 return text
         except Exception as e:
-            print(f'  Claude CLI failed: {e}', file=sys.stderr)
+            print(f'  Anthropic failed: {e}', file=sys.stderr)
 
     # 2. Gemini
     gemini_key = os.environ.get('GEMINI_API_KEY', '')
@@ -78,28 +87,5 @@ def call_llm(prompt, max_tokens=800):
                 return text
         except Exception as e:
             print(f'  OpenAI failed: {e}', file=sys.stderr)
-
-    # 5. Anthropic (fallback — may be rate-limited)
-    anthropic_key = os.environ.get('ANTHROPIC_API_KEY', '')
-    if anthropic_key:
-        body = json.dumps({
-            'model': 'claude-haiku-4-5-20251001',
-            'max_tokens': max_tokens,
-            'messages': [{'role': 'user', 'content': prompt}],
-        }).encode()
-        req = urllib.request.Request(
-            'https://api.anthropic.com/v1/messages', data=body,
-            headers={
-                'x-api-key': anthropic_key,
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
-            })
-        try:
-            resp = json.loads(urllib.request.urlopen(req, timeout=60).read())
-            text = resp['content'][0]['text']
-            if text:
-                return text
-        except Exception as e:
-            print(f'  Anthropic failed: {e}', file=sys.stderr)
 
     return ''
