@@ -7,6 +7,7 @@ Hot leads count from Sheets. Monthly burn from Paperclip. Momentum score 1-10.
 
 import os, json, sys, datetime
 import urllib.request, urllib.parse
+from bba_llm import call_llm
 
 def load_env():
     path = '/home/openclaw/byebyeadmin/ops/.env'
@@ -92,49 +93,6 @@ def graphql(query, variables=None):
     except Exception as e:
         print(f'  GraphQL failed: {e}', file=sys.stderr)
         return {}
-
-def call_llm(prompt, max_tokens=800):
-    """Anthropic Sonnet → Gemini → OpenAI cascade."""
-    if ANTHROPIC_KEY:
-        body = json.dumps({'model': 'claude-sonnet-4-6', 'max_tokens': max_tokens,
-            'messages': [{'role': 'user', 'content': prompt}]}).encode()
-        req = urllib.request.Request('https://api.anthropic.com/v1/messages', data=body,
-            headers={'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01',
-                     'Content-Type': 'application/json'})
-        try:
-            resp = json.loads(urllib.request.urlopen(req, timeout=60).read())
-            text = resp.get('content', [{}])[0].get('text', '')
-            if text:
-                return text
-        except Exception as e:
-            print(f'  Anthropic failed: {e} — trying Gemini', file=sys.stderr)
-    gemini_key = os.environ.get('GEMINI_API_KEY', '')
-    if gemini_key:
-        body = json.dumps({'contents': [{'parts': [{'text': prompt}]}],
-            'generationConfig': {'maxOutputTokens': max_tokens}}).encode()
-        gurl = (f'https://generativelanguage.googleapis.com/v1beta/models/'
-                f'gemini-2.0-flash:generateContent?key={gemini_key}')
-        req = urllib.request.Request(gurl, data=body, headers={'Content-Type': 'application/json'})
-        try:
-            resp = json.loads(urllib.request.urlopen(req, timeout=60).read())
-            return resp['candidates'][0]['content']['parts'][0]['text']
-        except Exception as e:
-            print(f'  Gemini failed: {e} — trying OpenAI', file=sys.stderr)
-    openai_key = os.environ.get('OPENAI_API_KEY', '')
-    if not openai_key:
-        return ''
-    body = json.dumps({'model': 'gpt-4o', 'max_tokens': max_tokens,
-        'messages': [{'role': 'user', 'content': prompt}]}).encode()
-    req = urllib.request.Request('https://api.openai.com/v1/chat/completions', data=body,
-        headers={'Authorization': f'Bearer {openai_key}', 'Content-Type': 'application/json'})
-    try:
-        resp = json.loads(urllib.request.urlopen(req, timeout=60).read())
-        return resp['choices'][0]['message']['content']
-    except Exception as e:
-        print(f'  OpenAI failed: {e}', file=sys.stderr)
-        return ''
-
-# ── dates ─────────────────────────────────────────────────────────────────────
 
 now       = datetime.datetime.utcnow()
 today     = now.strftime('%Y-%m-%d')

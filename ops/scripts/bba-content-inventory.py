@@ -5,6 +5,7 @@ Checks Buffer YouTube queue. Alerts George if fewer than 3 posts in next 7 days.
 
 import os, json, sys, datetime
 import urllib.request, urllib.parse
+from bba_llm import call_llm
 
 def load_env():
     path = '/home/openclaw/byebyeadmin/ops/.env'
@@ -40,35 +41,6 @@ def graphql(query, variables=None):
     except Exception as e:
         print(f'  GraphQL request failed: {e}', file=sys.stderr)
         return {}
-
-def call_llm(prompt, max_tokens=300):
-    """Anthropic → Gemini → OpenAI cascade."""
-    if ANTHROPIC_KEY:
-        body = json.dumps({'model': 'claude-haiku-4-5-20251001', 'max_tokens': max_tokens,
-            'messages': [{'role': 'user', 'content': prompt}]}).encode()
-        req = urllib.request.Request('https://api.anthropic.com/v1/messages', data=body,
-            headers={'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01',
-                     'Content-Type': 'application/json'})
-        try:
-            resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
-            text = resp.get('content', [{}])[0].get('text', '')
-            if text:
-                return text
-        except Exception as e:
-            print(f'  Anthropic failed: {e}', file=sys.stderr)
-    gemini_key = os.environ.get('GEMINI_API_KEY', '')
-    if gemini_key:
-        body = json.dumps({'contents': [{'parts': [{'text': prompt}]}],
-            'generationConfig': {'maxOutputTokens': max_tokens}}).encode()
-        gurl = (f'https://generativelanguage.googleapis.com/v1beta/models/'
-                f'gemini-2.0-flash:generateContent?key={gemini_key}')
-        req = urllib.request.Request(gurl, data=body, headers={'Content-Type': 'application/json'})
-        try:
-            resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
-            return resp['candidates'][0]['content']['parts'][0]['text']
-        except Exception as e:
-            print(f'  Gemini failed: {e}', file=sys.stderr)
-    return ''
 
 def slack_dm(text):
     try:

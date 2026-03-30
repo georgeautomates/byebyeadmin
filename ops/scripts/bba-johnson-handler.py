@@ -10,6 +10,7 @@ Paperclip sub-issue and posts the delegation to Slack.
 """
 
 import os, json, sys, urllib.request, urllib.parse
+from bba_llm import call_llm
 
 def load_env():
     path = '/home/openclaw/byebyeadmin/ops/.env'
@@ -54,49 +55,6 @@ def patch_issue(issue_id, data):
         urllib.request.urlopen(req, timeout=10)
     except Exception as e:
         print(f'  Paperclip PATCH failed: {e}', file=sys.stderr)
-
-def call_llm(prompt, max_tokens=800):
-    # Cascade: Gemini → Groq → OpenAI (Anthropic rate-limited on this VPS)
-    gemini_key = os.environ.get('GEMINI_API_KEY', '')
-    if gemini_key:
-        body = json.dumps({'contents': [{'parts': [{'text': prompt}]}],
-            'generationConfig': {'maxOutputTokens': max_tokens}}).encode()
-        gurl = (f'https://generativelanguage.googleapis.com/v1beta/models/'
-                f'gemini-2.0-flash:generateContent?key={gemini_key}')
-        req = urllib.request.Request(gurl, data=body, headers={'Content-Type': 'application/json'})
-        try:
-            resp = json.loads(urllib.request.urlopen(req, timeout=60).read())
-            text = resp['candidates'][0]['content']['parts'][0]['text']
-            if text:
-                return text
-        except Exception as e:
-            print(f'  Gemini failed: {e}', file=sys.stderr)
-    groq_key = os.environ.get('GROQ_API_KEY', '')
-    if groq_key:
-        body = json.dumps({'model': 'llama-3.3-70b-versatile', 'max_tokens': max_tokens,
-            'messages': [{'role': 'user', 'content': prompt}]}).encode()
-        req = urllib.request.Request('https://api.groq.com/openai/v1/chat/completions', data=body,
-            headers={'Authorization': f'Bearer {groq_key}', 'Content-Type': 'application/json'})
-        try:
-            resp = json.loads(urllib.request.urlopen(req, timeout=30).read())
-            text = resp['choices'][0]['message']['content']
-            if text:
-                return text
-        except Exception as e:
-            print(f'  Groq failed: {e}', file=sys.stderr)
-    openai_key = os.environ.get('OPENAI_API_KEY', '')
-    if not openai_key:
-        return ''
-    body = json.dumps({'model': 'gpt-4o', 'max_tokens': max_tokens,
-        'messages': [{'role': 'user', 'content': prompt}]}).encode()
-    req = urllib.request.Request('https://api.openai.com/v1/chat/completions', data=body,
-        headers={'Authorization': f'Bearer {openai_key}', 'Content-Type': 'application/json'})
-    try:
-        resp = json.loads(urllib.request.urlopen(req, timeout=60).read())
-        return resp['choices'][0]['message']['content']
-    except Exception as e:
-        print(f'  OpenAI failed: {e}', file=sys.stderr)
-        return ''
 
 def post_slack(text):
     if not SLACK_TOKEN:
