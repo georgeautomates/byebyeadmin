@@ -504,7 +504,7 @@ async function runApproval(approvalStr, runId = null) {
   await new Promise(resolve => setTimeout(resolve, 800));
 
   // Start Cloudflare quick tunnel for HTTPS (Instagram requires HTTPS video URLs)
-  const CLOUDFLARED = '/tmp/cloudflared';
+  const CLOUDFLARED = '/home/openclaw/.local/bin/cloudflared';
   let videoUrl = `http://178.104.12.113:8766/${igFilename}`;
   try {
     // Kill any existing tunnel

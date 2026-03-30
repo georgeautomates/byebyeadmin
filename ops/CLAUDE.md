@@ -92,19 +92,45 @@ agents/archive/          — old remote trigger implementations (reference only)
 
 ### VPS crontab (actual entries)
 
+All cron jobs go via the Paperclip webhook router (`http://127.0.0.1:8765/run/{agent}`), not direct script calls. Secret: `PAPERCLIP_WEBHOOK_SECRET` in VPS `.env`.
+
 ```
-0 8 * * 1-5   python3 /home/openclaw/byebyeadmin/ops/scripts/bba-morning-briefing.py >> ~/.openclaw/cron.log 2>&1
-30 8 * * 1    python3 /home/openclaw/byebyeadmin/ops/scripts/bba-weekly-analytics.py >> ~/.openclaw/cron.log 2>&1
-0 9,17 * * *  /home/openclaw/.nvm/versions/node/v22.22.1/bin/node /home/openclaw/byebyeadmin/ops/scripts/bba-pipeline-check.js --check >> ~/.openclaw/cron.log 2>&1
-0 6 * * *     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-content-inventory.py >> ~/.openclaw/cron.log 2>&1
-0 8 * * 0     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-website-review.py >> ~/.openclaw/cron.log 2>&1
-0 */4 * * *   python3 /home/openclaw/byebyeadmin/ops/scripts/bba-hot-leads.py >> ~/.openclaw/cron.log 2>&1
-0 12 * * *    /home/openclaw/.nvm/versions/node/v22.22.1/bin/node /home/openclaw/byebyeadmin/ops/scripts/bba-pipeline-check.js --chase >> ~/.openclaw/cron.log 2>&1
-0 9 * * 1     python3 /home/openclaw/byebyeadmin/ops/scripts/bba-content-strategist.py >> ~/.openclaw/cron.log 2>&1
-0 11 * * 0    python3 /home/openclaw/byebyeadmin/ops/scripts/bba-ceo-brief.py >> ~/.openclaw/cron.log 2>&1
+0 8  * * 1-5  curl -s -X POST http://127.0.0.1:8765/run/morning-brief    -H "X-Webhook-Secret: $SECRET" -d '{"runId":"cron"}' >> ~/.openclaw/cron.log 2>&1
+30 8 * * 1    curl -s -X POST http://127.0.0.1:8765/run/weekly-analytics  -H "X-Webhook-Secret: $SECRET" -d '{"runId":"cron"}' >> ~/.openclaw/cron.log 2>&1
+0 9,17 * * *  curl -s -X POST http://127.0.0.1:8765/run/pipeline-check    -H "X-Webhook-Secret: $SECRET" -d '{"runId":"cron"}' >> ~/.openclaw/cron.log 2>&1
+0 12 * * *    curl -s -X POST http://127.0.0.1:8765/run/pipeline-chase    -H "X-Webhook-Secret: $SECRET" -d '{"runId":"cron"}' >> ~/.openclaw/cron.log 2>&1
+0 6  * * *    curl -s -X POST http://127.0.0.1:8765/run/content-inventory -H "X-Webhook-Secret: $SECRET" -d '{"runId":"cron"}' >> ~/.openclaw/cron.log 2>&1
+0 8  * * 0    curl -s -X POST http://127.0.0.1:8765/run/website-review    -H "X-Webhook-Secret: $SECRET" -d '{"runId":"cron"}' >> ~/.openclaw/cron.log 2>&1
+0 */4 * * *   curl -s -X POST http://127.0.0.1:8765/run/hot-lead-monitor  -H "X-Webhook-Secret: $SECRET" -d '{"runId":"cron"}' >> ~/.openclaw/cron.log 2>&1
+0 9  * * 1    curl -s -X POST http://127.0.0.1:8765/run/content-strategist -H "X-Webhook-Secret: $SECRET" -d '{"runId":"cron"}' >> ~/.openclaw/cron.log 2>&1
+0 11 * * 0    curl -s -X POST http://127.0.0.1:8765/run/ceo-brief         -H "X-Webhook-Secret: $SECRET" -d '{"runId":"cron"}' >> ~/.openclaw/cron.log 2>&1
 ```
 
 Logs: `tail -f ~/.openclaw/cron.log` on VPS.
+
+### Content pipeline — video technical requirements
+
+The pipeline (`bba-pipeline-check.js`) posts videos to YouTube and Instagram via Buffer. Critical requirements:
+
+**Video encoding:** Source videos (often HEVC/4K from iPhone) must be compressed to H.264 before posting. The pipeline does this automatically in `runApproval()`:
+- Codec: H.264 baseline, level 3.1
+- Resolution: 1080×1920 (9:16 portrait)
+- Pixel format: yuv420p
+- Audio: AAC 128k
+- Flags: `-movflags +faststart`
+
+**HTTPS for Instagram:** Instagram's Graph API rejects HTTP video source URLs. The pipeline starts a Cloudflare quick tunnel (`cloudflared`) to expose the local video server as HTTPS. Binary: `/home/openclaw/.local/bin/cloudflared` (ARM64). **This binary must be present on the VPS.** If it disappears, reinstall: `wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 -O ~/.local/bin/cloudflared && chmod +x ~/.local/bin/cloudflared`
+
+**Video server:** Compressed video is served from the VPS on port 8766. A detached Node.js process handles this with a 48h auto-stop. UFW must allow port 8766.
+
+**Buffer channels:**
+- Instagram: `69b7de067be9f8b1715f2df4`
+- YouTube: `69b7df3d7be9f8b1715f313c`
+- Buffer org ID: `69b7dc8e9ab93fdee82b1f6e`
+
+**Google tokens (separate scopes):**
+- `GOOGLE_DRIVE_REFRESH_TOKEN` — drive.readonly (downloading videos from Drive)
+- `GOOGLE_REFRESH_TOKEN` — spreadsheets + gmail (Sheets read/write)
 
 ### Instantly API proxy
 

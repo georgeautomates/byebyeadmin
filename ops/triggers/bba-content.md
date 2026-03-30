@@ -18,6 +18,12 @@ Hard rules for all copy:
 - Short sentences. Active voice. Specifics beat claims.
 - Follow caption-writing.md exactly
 
+Technical rules for video posting via Buffer:
+- Source videos may be HEVC/4K — must compress to H.264 1080×1920 before posting (pipeline handles this)
+- Instagram requires HTTPS video URLs — pipeline uses cloudflared tunnel at `/home/openclaw/.local/bin/cloudflared`
+- Video served from VPS port 8766 — must be running when Buffer fetches
+- YouTube accepts HTTP; Instagram requires HTTPS
+
 ---
 
 ## When the prompt says "PIPELINE CHECK":
