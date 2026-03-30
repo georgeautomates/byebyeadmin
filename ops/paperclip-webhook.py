@@ -49,6 +49,7 @@ AGENT_IDS = {
     'copywriter':         'a85864ef-7691-4fd4-a715-5248d3b8f356',
     'cron-watchdog':      '88ccefac-ed41-4efb-9b25-ea40401fedb8',
     'chief-of-staff':     'ce07090f-ec39-4384-82ff-47c286bc01d1',
+    'johnson':            '80570e2d-92fd-431c-8239-1f5d48826927',
 }
 
 def paperclip_post(path, data):
@@ -110,6 +111,7 @@ AGENTS = {
     'copywriter':         ['python3', f'{SCRIPTS}/bba-copywriter.py', '--source', 'pipeline'],
     'cron-watchdog':      ['python3', f'{SCRIPTS}/bba-cron-watchdog.py'],
     'chief-of-staff':     ['python3', f'{SCRIPTS}/bba-chief-of-staff.py'],
+    'johnson':            ['python3', f'{SCRIPTS}/bba-johnson-handler.py'],
 }
 
 # ── HTTP handler ───────────────────────────────────────────────────────────────
