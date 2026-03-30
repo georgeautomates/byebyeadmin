@@ -26,6 +26,31 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    // Video proxy route — no auth required, serves VPS video files over HTTPS for Buffer/Instagram
+    if (url.pathname.startsWith('/video/')) {
+      const filename = encodeURIComponent(url.pathname.replace('/video/', ''));
+      const vpsUrl = `http://178.104.12.113:8766/${filename}`;
+      try {
+        const rangeHeader = request.headers.get('Range');
+        const vpsReq = rangeHeader
+          ? new Request(vpsUrl, { headers: { Range: rangeHeader } })
+          : new Request(vpsUrl);
+        const upstream = await fetch(vpsReq);
+        const resHeaders = new Headers();
+        resHeaders.set('Content-Type', 'video/mp4');
+        resHeaders.set('Accept-Ranges', 'bytes');
+        resHeaders.set('Access-Control-Allow-Origin', '*');
+        const cl = upstream.headers.get('Content-Length');
+        const cr = upstream.headers.get('Content-Range');
+        if (cl) resHeaders.set('Content-Length', cl);
+        if (cr) resHeaders.set('Content-Range', cr);
+        return new Response(upstream.body, { status: upstream.status, headers: resHeaders });
+      } catch (err) {
+        return new Response('Video proxy error: ' + String(err), { status: 502 });
+      }
+    }
+
     const targetURL = INSTANTLY_BASE + url.pathname + url.search;
 
     // Forward original headers (including Authorization) to Instantly

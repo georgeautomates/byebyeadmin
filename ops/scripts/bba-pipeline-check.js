@@ -483,8 +483,7 @@ async function runApproval(approvalStr, runId = null) {
     fs.copyFileSync(tmpVideoPath, igVideoPath);
   }
 
-  // Kill any existing server on port 8766, then start a background server (48h auto-stop)
-  const videoUrl = `http://178.104.12.113:8766/${igFilename}`;
+  // Kill any existing server on port 8766, then start a background HTTP server
   try { execSync('fuser -k 8766/tcp 2>/dev/null || true', { stdio: 'pipe' }); } catch {}
   await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -494,6 +493,7 @@ async function runApproval(approvalStr, runId = null) {
       const f='/tmp/'+require('path').basename(req.url);
       if(!fs.existsSync(f)){res.writeHead(404);res.end();return;}
       res.setHeader('Content-Type','video/mp4');
+      res.setHeader('Content-Length',fs.statSync(f).size);
       fs.createReadStream(f).pipe(res);
     });
     server.listen(8766,()=>console.log('Video server started on 8766'));
@@ -502,7 +502,39 @@ async function runApproval(approvalStr, runId = null) {
   const srv = spawn(process.execPath, ['-e', serverScript], { detached: true, stdio: 'ignore' });
   srv.unref();
   await new Promise(resolve => setTimeout(resolve, 800));
-  console.log(`Serving video at ${videoUrl}`);
+
+  // Start Cloudflare quick tunnel for HTTPS (Instagram requires HTTPS video URLs)
+  const CLOUDFLARED = '/tmp/cloudflared';
+  let videoUrl = `http://178.104.12.113:8766/${igFilename}`;
+  try {
+    // Kill any existing tunnel
+    execSync('pkill -f "cloudflared tunnel" 2>/dev/null || true', { stdio: 'pipe' });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const cfProc = spawn(CLOUDFLARED, ['tunnel', '--url', 'http://localhost:8766', '--no-autoupdate'], {
+      detached: true, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    cfProc.unref();
+    // Wait up to 15s for the HTTPS URL to appear in output
+    const tunnelUrl = await new Promise(resolve => {
+      let buf = '';
+      const onData = d => {
+        buf += d.toString();
+        const m = buf.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+        if (m) resolve(m[0]);
+      };
+      cfProc.stdout.on('data', onData);
+      cfProc.stderr.on('data', onData);
+      setTimeout(() => resolve(null), 15000);
+    });
+    if (tunnelUrl) {
+      videoUrl = `${tunnelUrl}/${igFilename}`;
+      console.log(`Cloudflare tunnel HTTPS URL: ${videoUrl}`);
+    } else {
+      console.warn('Cloudflare tunnel URL not obtained — falling back to HTTP');
+    }
+  } catch (e) {
+    console.warn('Cloudflare tunnel failed, using HTTP fallback:', e.message);
+  }
 
   // Schedule posts in Buffer
   console.log('Scheduling Buffer posts...');
