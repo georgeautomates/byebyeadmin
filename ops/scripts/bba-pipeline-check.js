@@ -199,13 +199,54 @@ async function getPendingApprovals(token) {
   return rows.slice(1).map((r, i) => ({ rowIndex: i + 2, data: r }));
 }
 
-function scheduleDate() {
-  // Next available weekday at 10am UK time (approximated as UTC+1)
+async function scheduleDate() {
+  // Query Buffer for already-scheduled post dates so we don't double-book a day
+  const channelIds = [BUFFER_CHANNELS.instagram, BUFFER_CHANNELS.youtube].filter(Boolean);
+  const occupiedDates = new Set();
+  try {
+    const body = JSON.stringify({
+      query: `query GetScheduled($input: PostsInput!) {
+        posts(input: $input) { edges { node { dueAt } } }
+      }`,
+      variables: {
+        input: {
+          organizationId: BUFFER_ORG_ID,
+          filter: {
+            channelIds,
+            status: ['scheduled'],
+            dueAt: {
+              start: new Date().toISOString(),
+              end: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+            },
+          },
+        },
+      },
+    });
+    const resp = await request('https://api.buffer.com/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BUFFER_TOKEN}`, 'Content-Length': Buffer.byteLength(body) },
+      body,
+    });
+    for (const e of (resp?.data?.posts?.edges || [])) {
+      if (e.node.dueAt) occupiedDates.add(e.node.dueAt.slice(0, 10));
+    }
+    console.log('Already scheduled dates:', [...occupiedDates].join(', ') || 'none');
+  } catch (e) {
+    console.warn('Could not query Buffer scheduled dates, using basic fallback:', e.message);
+  }
+
+  // Find next weekday at 10am UK (9am UTC) not already occupied
   const d = new Date();
-  d.setUTCHours(10, 0, 0, 0);
-  if (d.getTime() < Date.now() + 3600000) d.setUTCDate(d.getUTCDate() + 1);
-  // Skip weekends
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
+  d.setUTCHours(9, 0, 0, 0);
+  if (Date.now() > d.getTime() - 3600000) d.setUTCDate(d.getUTCDate() + 1);
+  for (let i = 0; i < 60; i++) {
+    const day = d.getUTCDay();
+    const dateStr = d.toISOString().slice(0, 10);
+    if (day !== 0 && day !== 6 && !occupiedDates.has(dateStr)) {
+      return dateStr + 'T10:00:00';
+    }
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
   return d.toISOString().slice(0, 10) + 'T10:00:00';
 }
 
@@ -382,7 +423,7 @@ Rules:
 
   // 9. Write to Pending Approvals
   const runId = `${video.name.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 40)}-${Date.now()}`;
-  const schedDate = scheduleDate();
+  const schedDate = await scheduleDate();
   await sheetsAppend(sheetsToken, 'Pending Approvals!A:M', [[
     runId, video.name, video.id, schedDate,
     title_1, title_2, title_3, ig_1, ig_2, linkedin, yt_description,
