@@ -91,6 +91,9 @@ AGENTS = [
     {"key": "content_analyst", "name": "Content Analyst", "title": "Content Performance Analyst", "role": "researcher",
      "manager_ref": "content_manager",
      "routine_desc": "Weekly YouTube performance analysis. Identify what titles, hooks, subjects, and formats are working. Feed insights to Content Strategist."},
+    {"key": "script_writer", "name": "Script Writer", "title": "Recording Script Writer", "role": "general",
+     "manager_ref": "content_manager",
+     "routine_desc": "Write talk-to-camera scripts from Content Strategist ideas using George's proven scripting style. Posts scripts to Slack for review."},
     {"key": "question_master", "name": "Question Master", "title": "Ambiguity Resolver", "role": "general",
      "manager_ref": "content_manager",
      "routine_desc": "Resolve ambiguity for content team agents. Route questions to George via Johnson."},
@@ -173,7 +176,7 @@ BUNDLES = {
         "schedule": {"Hour": 6, "Minute": 0},
     },
     "monday": {
-        "agents": ["content_analyst", "weekly_ceo_brief", "content_strategist"],
+        "agents": ["content_analyst", "weekly_ceo_brief", "content_strategist", "script_writer"],
         "plist": "com.bba.monday",
         "schedule": {"Hour": 8, "Minute": 30},
         "weekdays": [1],

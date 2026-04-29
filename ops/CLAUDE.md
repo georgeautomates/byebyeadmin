@@ -74,6 +74,7 @@ All scheduled AI logic runs as Python/Node.js scripts directly on the VPS. Scrip
 | `ops/scripts/bba-pipeline-check.js` | 12pm UTC daily (--chase) | Check Buffer for today's posts: notify if live + remind to share to Facebook; chase if still pending |
 | `ops/scripts/bba-content-analyst.py` | 8:30am UTC Monday | YouTube performance analysis: what titles, hooks, subjects, formats are working. Feeds insights to Content Strategist → Slack + Sheets |
 | `ops/scripts/bba-content-strategist.py` | 8:30am UTC Monday | Perplexity trends + YouTube + performance insights → 5 video ideas (2 Shorts + 3 long) with confidence scores → Slack + Sheets |
+| `ops/scripts/bba-script-writer.py` | 8:30am UTC Monday | Reads strategist ideas + scripting style guide + top transcripts → full talk-to-camera scripts in George's voice → Slack + Sheets |
 | `ops/scripts/bba-ceo-brief.py` | 11am UTC Sunday | Weekly CEO synthesis: all KPIs + Perplexity competitor watch + agent health + momentum score → Slack |
 
 ### On-demand scripts (via Slack DM to Johnson)
