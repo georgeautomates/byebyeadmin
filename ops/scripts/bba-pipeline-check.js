@@ -43,6 +43,8 @@ const OPENAI_KEY     = process.env.OPENAI_API_KEY;
 const BUFFER_TOKEN   = process.env.BUFFER_TOKEN;
 const GCP_CLIENT_ID     = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
 const GCP_SECRET        = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
+const DRIVE_CLIENT_ID   = process.env.GOOGLE_DRIVE_CLIENT_ID || GCP_CLIENT_ID;
+const DRIVE_SECRET      = process.env.GOOGLE_DRIVE_CLIENT_SECRET || GCP_SECRET;
 const DRIVE_REFRESH     = process.env.GOOGLE_DRIVE_REFRESH_TOKEN; // drive.readonly scope
 const SHEETS_REFRESH    = process.env.GOOGLE_REFRESH_TOKEN;       // spreadsheets scope
 const SHEET_ID          = process.env.GOOGLE_CONTENT_SHEET_ID;
@@ -103,14 +105,14 @@ async function postForm(url, data) {
 
 // ── GCP token ─────────────────────────────────────────────────────────────────
 
-async function getGcpToken(refreshToken) {
+async function getGcpToken(refreshToken, clientId = GCP_CLIENT_ID, clientSecret = GCP_SECRET) {
   const resp = await postForm('https://oauth2.googleapis.com/token', {
-    client_id: GCP_CLIENT_ID, client_secret: GCP_SECRET,
+    client_id: clientId, client_secret: clientSecret,
     refresh_token: refreshToken, grant_type: 'refresh_token',
   });
   return resp.access_token || '';
 }
-async function getDriveToken()  { return getGcpToken(DRIVE_REFRESH); }
+async function getDriveToken()  { return getGcpToken(DRIVE_REFRESH, DRIVE_CLIENT_ID, DRIVE_SECRET); }
 async function getSheetsToken() { return getGcpToken(SHEETS_REFRESH); }
 
 // ── Slack ─────────────────────────────────────────────────────────────────────
