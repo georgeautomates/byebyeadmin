@@ -181,6 +181,25 @@ token_resp = post_form('https://oauth2.googleapis.com/token', {
 })
 gcp_token = token_resp.get('access_token', '')
 
+# ── 4b. Read latest Content Performance report ──────────────────────────────
+
+performance_insights = ''
+if gcp_token and SHEET_ID:
+    print('Fetching latest Content Performance report...')
+    perf_sheet = get(
+        f'https://sheets.googleapis.com/v4/spreadsheets/{SHEET_ID}'
+        f'/values/Content%20Performance!A:G?majorDimension=ROWS',
+        {'Authorization': f'Bearer {gcp_token}'}
+    )
+    perf_rows = (perf_sheet or {}).get('values', [])
+    if len(perf_rows) > 1:
+        latest = perf_rows[-1]
+        performance_insights = latest[6] if len(latest) > 6 else ''
+        if performance_insights:
+            print(f'  Got performance report ({len(performance_insights)} chars).')
+    if not performance_insights:
+        print('  No performance report found. Content Analyst may not have run yet.')
+
 # ── 5. Generate 5 ideas via LLM ───────────────────────────────────────────────
 
 print('Calling LLM for content ideas...')
@@ -209,6 +228,8 @@ Industry trends this week:
 
 Top performing videos (learn from these):
 {top_perf_str or 'No data'}
+
+{f'Content Performance Analyst insights (USE THESE to guide your ideas):{chr(10)}{performance_insights[:800]}' if performance_insights else ''}
 
 Recently uploaded (DO NOT repeat similar topics):
 {existing_str}
