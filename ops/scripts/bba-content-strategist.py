@@ -31,9 +31,9 @@ YT_CHANNEL      = os.environ['YOUTUBE_CHANNEL_ID']
 BUFFER_TOKEN    = os.environ['BUFFER_TOKEN']
 BUFFER_ORG_ID   = '69b7dc8e9ab93fdee82b1f6e'
 BUFFER_YT_ID    = '69b7df3d7be9f8b1715f313c'
-GCP_CLIENT_ID   = os.environ.get('GOOGLE_DRIVE_CLIENT_ID', '')  # gmail.com — owns ops Sheets
-GCP_SECRET      = os.environ.get('GOOGLE_DRIVE_CLIENT_SECRET', '')
-GCP_REFRESH     = os.environ.get('GOOGLE_DRIVE_REFRESH_TOKEN', '')
+GCP_CLIENT_ID   = os.environ.get('GOOGLE_CLIENT_ID', '')        # byebyeadmin.com — Sheets scope
+GCP_SECRET      = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+GCP_REFRESH     = os.environ.get('GOOGLE_REFRESH_TOKEN', '')
 SHEET_ID        = os.environ.get('GOOGLE_CONTENT_SHEET_ID', '')
 
 # ── helpers ───────────────────────────────────────────────────────────────────
